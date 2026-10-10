@@ -1,10 +1,12 @@
 import os
 import re
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File, Form, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+import httpx
+import urllib.parse
 
 from app.core.db import get_db
 from app.modules.course.models import Course, Chapter, Lesson, UserReadProgress
@@ -548,3 +550,31 @@ async def trigger_tts_generation(lesson_id: int, background_tasks: BackgroundTas
 
     background_tasks.add_task(_generate_lesson_tts_task, lesson_id)
     return {"status": "queued", "message": "TTS generation queued in background"}
+
+@router.get("/tts/stream")
+async def stream_tts(text: str, lang: str = "vi"):
+    """
+    Real-time streaming TTS audio fallback.
+    Provides instant natural Vietnamese / Japanese speech synthesis when the user's browser lacks local voice models.
+    """
+    clean_text = text.strip()
+    if not clean_text:
+        raise HTTPException(status_code=400, detail="Text required")
+
+    lang_code = "vi" if lang.startswith("vi") else ("ja" if lang.startswith("ja") else "en")
+    tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl={lang_code}&q={urllib.parse.quote(clean_text[:400])}"
+
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.get(tts_url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://translate.google.com/"
+            })
+            if resp.status_code == 200:
+                return Response(content=resp.content, media_type="audio/mpeg")
+    except Exception as e:
+        import logging
+        logging.getLogger("uvicorn.error").error(f"TTS stream error: {e}")
+
+    raise HTTPException(status_code=500, detail="Failed to synthesize speech audio")
+

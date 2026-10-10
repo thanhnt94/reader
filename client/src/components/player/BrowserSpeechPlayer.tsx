@@ -237,6 +237,24 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const synthRef = useRef<SpeechSynthesis | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Stop both speech synthesis and any playing audio stream
+  const stopAllAudio = () => {
+    if (synthRef.current) {
+      try {
+        synthRef.current.cancel();
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current = null;
+    }
+  };
 
   // Initialize SpeechSynthesis and load browser voices
   useEffect(() => {
@@ -253,9 +271,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     }
 
     return () => {
-      if (synthRef.current) {
-        synthRef.current.cancel();
-      }
+      stopAllAudio();
     };
   }, []);
 
@@ -267,9 +283,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
       setCurrentIndex(0);
       setIsPlaying(false);
       setIsPaused(false);
-      if (synthRef.current) {
-        synthRef.current.cancel();
-      }
+      stopAllAudio();
     }
   }, [rawMarkdown]);
 
@@ -284,37 +298,91 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
   // Find best matching voice for language
   const getVoiceForLang = (lang: DetectedLang): SpeechSynthesisVoice | null => {
-    const langPrefix = lang.split('-')[0]; // 'ja', 'vi', 'en'
-    const exact = voices.find((v) => v.lang.toLowerCase() === lang.toLowerCase());
+    const langPrefix = lang.split('-')[0].toLowerCase();
+
+    // 1. Exact match on language prefix or code
+    const exact = voices.find((v) => {
+      const vLang = v.lang.toLowerCase().replace('_', '-');
+      return vLang === lang.toLowerCase() || vLang.startsWith(langPrefix);
+    });
     if (exact) return exact;
 
-    const natural = voices.find(
-      (v) =>
-        v.lang.toLowerCase().startsWith(langPrefix) &&
-        (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Online'))
-    );
-    if (natural) return natural;
+    // 2. Keyword match in voice name
+    if (langPrefix === 'vi') {
+      const viVoice = voices.find((v) => {
+        const name = v.name.toLowerCase();
+        return name.includes('vietnam') || name.includes('tiếng việt') || name.includes('hoaimy') || name.includes('an');
+      });
+      if (viVoice) return viVoice;
+    }
 
-    const fallback = voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix));
-    return fallback || null;
+    if (langPrefix === 'ja') {
+      const jaVoice = voices.find((v) => {
+        const name = v.name.toLowerCase();
+        return name.includes('japan') || name.includes('nihongo') || name.includes('nanami') || name.includes('kyoko');
+      });
+      if (jaVoice) return jaVoice;
+    }
+
+    return null;
   };
 
   // Speak sentence at specific index
   const speakSentence = (index: number) => {
-    if (!synthRef.current || index < 0 || index >= activeSentences.length) {
+    if (index < 0 || index >= activeSentences.length) {
       setIsPlaying(false);
       setIsPaused(false);
       return;
     }
 
-    synthRef.current.cancel();
+    stopAllAudio();
 
     const target = activeSentences[index];
+    const matchedVoice = getVoiceForLang(target.lang);
+
+    // CRITICAL: If language is Vietnamese ('vi-VN') and NO Vietnamese voice is found on the client device:
+    // DO NOT allow the browser's default English voice to read Vietnamese text!
+    // Instead, stream authentic Vietnamese audio from /api/v1/tts/stream!
+    if ((target.lang === 'vi-VN' && !matchedVoice) || (target.lang === 'ja-JP' && !matchedVoice)) {
+      const langParam = target.lang === 'vi-VN' ? 'vi' : 'ja';
+      const streamUrl = `/api/v1/tts/stream?text=${encodeURIComponent(target.text)}&lang=${langParam}`;
+      const audio = new Audio(streamUrl);
+      audio.playbackRate = speed;
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        if (index + 1 < activeSentences.length) {
+          setCurrentIndex(index + 1);
+          speakSentence(index + 1);
+        } else {
+          setIsPlaying(false);
+          setIsPaused(false);
+          setCurrentIndex(0);
+        }
+      };
+
+      audio.onerror = (e) => {
+        console.warn('Audio stream error:', e);
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
+
+      setIsPlaying(true);
+      setIsPaused(false);
+      audio.play().catch((err) => {
+        console.warn('Audio play error:', err);
+        setIsPlaying(false);
+        setIsPaused(false);
+      });
+      return;
+    }
+
+    if (!synthRef.current) return;
+
     const utterance = new SpeechSynthesisUtterance(target.text);
     utterance.lang = target.lang;
     utterance.rate = speed;
 
-    const matchedVoice = getVoiceForLang(target.lang);
     if (matchedVoice) {
       utterance.voice = matchedVoice;
     }
@@ -342,27 +410,36 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handlePlay = () => {
-    if (!synthRef.current) return;
-
     if (isPaused) {
-      synthRef.current.resume();
-      setIsPaused(false);
-      setIsPlaying(true);
-    } else {
-      speakSentence(currentIndex);
+      if (audioRef.current) {
+        audioRef.current.play();
+        setIsPaused(false);
+        setIsPlaying(true);
+        return;
+      }
+      if (synthRef.current) {
+        synthRef.current.resume();
+        setIsPaused(false);
+        setIsPlaying(true);
+        return;
+      }
     }
+    speakSentence(currentIndex);
   };
 
   const handlePause = () => {
-    if (!synthRef.current) return;
-    synthRef.current.pause();
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (synthRef.current) {
+      synthRef.current.pause();
+    }
     setIsPaused(true);
     setIsPlaying(false);
   };
 
   const handleStop = () => {
-    if (!synthRef.current) return;
-    synthRef.current.cancel();
+    stopAllAudio();
     setIsPlaying(false);
     setIsPaused(false);
     setCurrentIndex(0);
