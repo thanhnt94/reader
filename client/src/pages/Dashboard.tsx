@@ -369,7 +369,10 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <h3 className="font-bold text-base text-white mb-2 group-hover:text-emerald-300 transition-colors">
+                    <h3
+                      onClick={() => navigate(`/courses/${c.slug || c.id}`)}
+                      className="font-bold text-base text-white mb-2 group-hover:text-emerald-300 transition-colors cursor-pointer"
+                    >
                       {c.title}
                     </h3>
                     <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-6">
@@ -395,19 +398,12 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={async () => {
-                          const detail = await readerApi.getCourseDetail(c.id);
-                          const firstLes = detail.chapters?.[0]?.lessons?.[0];
-                          if (firstLes) {
-                            navigate(`/courses/${c.slug || c.id}/${firstLes.slug || firstLes.id}`);
-                          } else {
-                            setManageCourseId(c.id);
-                          }
-                        }}
-                        className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        onClick={() => navigate(`/courses/${c.slug || c.id}`)}
+                        className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        <span>Start Reading</span>
-                        <ChevronRight className="w-4 h-4" />
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Dashboard</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
                       </button>
 
                       {user?.role === 'admin' && (

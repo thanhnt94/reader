@@ -202,7 +202,13 @@ export default function LessonReader() {
             {course && (
               <>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                <span className="text-slate-400 truncate hidden sm:inline">{course.title}</span>
+                <span
+                  onClick={() => navigate(`/courses/${course.slug || course.id}`)}
+                  className="text-slate-400 hover:text-emerald-400 cursor-pointer truncate hidden sm:inline"
+                  title="View Course Dashboard"
+                >
+                  {course.title}
+                </span>
               </>
             )}
             <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from './store/useAppStore';
 
 import Dashboard from './pages/Dashboard';
+import CourseDashboard from './pages/CourseDashboard';
 import LessonReader from './pages/LessonReader';
 import LiveEditor from './pages/LiveEditor';
 import Login from './pages/Login';
@@ -67,6 +68,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/courses" element={<Dashboard />} />
+          <Route path="/courses/:courseSlugOrId" element={<CourseDashboard />} />
           <Route path="/courses/:courseSlug/:lessonSlug" element={<LessonReader />} />
           <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonReader />} />
           <Route path="/reader/:lessonId" element={<LessonReader />} />

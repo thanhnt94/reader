@@ -111,9 +111,12 @@ async def create_course(data: CourseCreateRequest, db: AsyncSession = Depends(ge
     await db.refresh(course)
     return course.to_dict()
 
-@router.get("/courses/{course_id}")
-async def get_course_detail(course_id: int, db: AsyncSession = Depends(get_db), current_user: Optional[User] = Depends(get_current_user_optional)):
-    res = await db.execute(select(Course).where(Course.id == course_id))
+@router.get("/courses/{course_id_or_slug}")
+async def get_course_detail(course_id_or_slug: str, db: AsyncSession = Depends(get_db), current_user: Optional[User] = Depends(get_current_user_optional)):
+    if course_id_or_slug.isdigit():
+        res = await db.execute(select(Course).where(Course.id == int(course_id_or_slug)))
+    else:
+        res = await db.execute(select(Course).where(Course.slug == course_id_or_slug))
     course = res.scalar_one_or_none()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -121,7 +124,7 @@ async def get_course_detail(course_id: int, db: AsyncSession = Depends(get_db), 
     c_dict = course.to_dict()
 
     # Load chapters
-    chap_res = await db.execute(select(Chapter).where(Chapter.course_id == course_id).order_by(Chapter.order_num, Chapter.id))
+    chap_res = await db.execute(select(Chapter).where(Chapter.course_id == course.id).order_by(Chapter.order_num, Chapter.id))
     chapters = chap_res.scalars().all()
 
     # Load progress map if user logged in

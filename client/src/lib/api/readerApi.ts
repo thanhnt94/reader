@@ -102,8 +102,8 @@ export const readerApi = {
     const res = await apiClient.get('/api/v1/courses');
     return res.data;
   },
-  getCourseDetail: async (courseId: number): Promise<Course> => {
-    const res = await apiClient.get(`/api/v1/courses/${courseId}`);
+  getCourseDetail: async (courseIdOrSlug: number | string): Promise<Course> => {
+    const res = await apiClient.get(`/api/v1/courses/${courseIdOrSlug}`);
     return res.data;
   },
   createCourse: async (data: { title: string; description?: string; icon?: string }): Promise<Course> => {
