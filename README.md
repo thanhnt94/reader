@@ -27,11 +27,14 @@
 3. **Batch Import Khóa học**:
    - Nạp hàng loạt qua file `.zip` hoặc quét trực tiếp thư mục máy chủ (ví dụ `Ecosystem/JSST`).
    - Bóc tách YAML Frontmatter (`title`, `order`, `duration`, `tts: true`) và trích xuất Table of Contents (TOC) tự động.
-4. **Karaoke Read-Along & Multilingual TTS**:
-   - Tiền xử lý văn bản tiếng Nhật/Việt/Anh sạch sẽ (loại bỏ code block, url, cú pháp markdown).
-   - Tự động sinh file audio `.mp3` chất lượng cao bằng `edge-tts` và file timestamps `.json`.
-   - Trình phát docked bottom bar: Play/Pause, tua ±10s, chọn tốc độ đọc (0.8x - 1.5x), tự động highlight câu đang đọc và cuộn màn hình mượt mà.
-5. **Bố cục 3 cột (3-Column Layout)**:
+4. **CentralAuth Synchronized TTS Audio Player**:
+   - Đồng bộ hóa tạo âm thanh bài đọc trực tiếp qua CentralAuth (`POST /api/tts/generate`), lưu trữ tập trung tại CDN CentralAuth (`https://inmind.site/static/reader/{lesson_id}/audio/...`).
+   - Trình phát âm thanh tiêu chuẩn hiện đại (Modern Glassmorphic Docked Player): Play/Pause, tua ±10s, chọn tốc độ đọc (0.8x - 2.0x), thanh tua tiến trình (Seekable Scrubber), điều chỉnh âm lượng & Mute.
+   - Loại bỏ độ trễ và sự cồng kềnh của cơ chế highlight từng câu Karaoke, mang lại trải nghiệm đọc sách tự nhiên, mượt mà.
+5. **CentralAuth SSO Integration & Công Tắc Bật Tắt (SSO Toggle)**:
+   - Hỗ trợ công tắc bật/tắt linh hoạt giữa **Đăng nhập tập trung CentralAuth** (`https://inmind.site/api/auth/jump/reader-v1`) và **Đăng nhập tài khoản nội bộ** (Local Login / Backdoor Bypass `?backdoor=1`).
+   - Tích hợp Modal Cài đặt SSO với tính năng Kiểm tra kết nối tức thời (`POST /api/sso/test`).
+6. **Bố cục 3 cột (3-Column Layout)**:
    - Sidebar phân cấp Cây thư mục (Khóa học -> Chương -> Bài học) có trạng thái đã đọc.
    - Cột đọc bài tối ưu typography, hỗ trợ Focus Mode.
    - Mục lục bài viết (TOC) bám dính khi cuộn màn hình (Scrollspy).
