@@ -57,6 +57,7 @@ app.add_middleware(
         "http://127.0.0.1:5070",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5000",
+        "https://read.inmind.site",
         "https://reader.inmind.site",
         "https://auth.inmind.site",
         "https://vocab.inmind.site",

@@ -1,11 +1,11 @@
 # 📖 Reader LMS — Interactive MDX & Karaoke TTS Platform
 
-**Reader** (`reader.inmind.site`) là nền tảng bài giảng số (File-driven LMS) trong Hệ sinh thái InMind Ecosystem. Ứng dụng cho phép tạo khóa học từ các file Markdown (`.md`), tích hợp trình đọc tương tác cấp độ 4 (Interactive MDX), trình phát âm thanh Karaoke đồng bộ câu chữ (Read-Along TTS), và xác thực tập trung qua **CentralAuth**.
+**Reader** (`read.inmind.site`) là nền tảng bài giảng số (File-driven LMS) trong Hệ sinh thái InMind Ecosystem. Ứng dụng cho phép tạo khóa học từ các file Markdown (`.md`), tích hợp trình đọc tương tác cấp độ 4 (Interactive MDX), trình phát âm thanh Karaoke đồng bộ câu chữ (Read-Along TTS), và xác thực tập trung qua **CentralAuth**.
 
 ---
 
 ## 🌐 Thông số Kỹ thuật & Cổng Dịch vụ
-* **Domain**: `reader.inmind.site`
+* **Domain**: `read.inmind.site` (hỗ trợ cả `reader.inmind.site`)
 * **Local Dev Port**: `5070` (`http://localhost:5070`)
 * **CentralAuth Client ID**: `reader-v1`
 * **Database**: `Storage/database/Reader.db` (SQLite WAL mode)

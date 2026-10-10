@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     CENTRALAUTH_QUEUE_TOKEN: str = os.getenv("CENTRALAUTH_QUEUE_TOKEN", "super-secret-token-123")
     CLIENT_ID: str = os.getenv("CLIENT_ID", "reader-v1")
     CLIENT_SECRET: str = os.getenv("CLIENT_SECRET", "reader_secret_123")
-    APP_BASE_URL: str = os.getenv("APP_BASE_URL", "https://reader.inmind.site")
+    APP_BASE_URL: str = os.getenv("APP_BASE_URL", "https://read.inmind.site")
 
     class Config:
         case_sensitive = True
