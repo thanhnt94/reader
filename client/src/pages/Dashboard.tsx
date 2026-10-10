@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   BookOpen,
   FolderUp,
@@ -13,14 +14,16 @@ import {
   Upload,
   Folder,
   X,
-  Sparkles
+  Sparkles,
+  Settings as SettingsIcon,
+  Globe
 } from 'lucide-react';
 import { readerApi, Course } from '../lib/api/readerApi';
 import { useAppStore } from '../store/useAppStore';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, isLoggedIn, logout, authConfig } = useAppStore();
+  const { user, isLoggedIn, logout, authConfig, fetchAuthConfig } = useAppStore();
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,6 +37,71 @@ export default function Dashboard() {
   const [importCourseTitle, setImportCourseTitle] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importMsg, setImportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // SSO Settings State
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [ssoUrl, setSsoUrl] = useState('https://inmind.site');
+  const [ssoClientId, setSsoClientId] = useState('reader-v1');
+  const [ssoClientSecret, setSsoClientSecret] = useState('reader_secret_123');
+  const [ssoEnabled, setSsoEnabled] = useState(true);
+  const [ssoTestStatus, setSsoTestStatus] = useState<{ status: 'idle' | 'loading' | 'success' | 'error'; message: string }>({
+    status: 'idle',
+    message: ''
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  const loadSSOConfig = async () => {
+    try {
+      const res = await axios.get('/api/sso/config');
+      if (res.data) {
+        setSsoUrl(res.data.server_url || 'https://inmind.site');
+        setSsoClientId(res.data.client_id || 'reader-v1');
+        setSsoClientSecret(res.data.client_secret || 'reader_secret_123');
+        setSsoEnabled(res.data.is_enabled ?? true);
+      }
+    } catch (e) {
+      console.warn('Could not load SSO config:', e);
+    }
+  };
+
+  const handleOpenSettings = () => {
+    loadSSOConfig();
+    setIsSettingsModalOpen(true);
+    setSsoTestStatus({ status: 'idle', message: '' });
+  };
+
+  const handleTestSSO = async () => {
+    setSsoTestStatus({ status: 'loading', message: 'Testing connection...' });
+    try {
+      const res = await axios.post('/api/sso/test', { server_url: ssoUrl.trim() });
+      if (res.data?.status === 'success') {
+        setSsoTestStatus({ status: 'success', message: res.data.message || 'Connected successfully!' });
+      } else {
+        setSsoTestStatus({ status: 'error', message: res.data?.message || 'Connection failed' });
+      }
+    } catch (e: any) {
+      setSsoTestStatus({ status: 'error', message: e.response?.data?.message || e.message || 'Connection test failed' });
+    }
+  };
+
+  const handleSaveSSOSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    try {
+      await axios.post('/api/sso/config', {
+        is_enabled: ssoEnabled,
+        server_url: ssoUrl.trim(),
+        client_id: ssoClientId.trim(),
+        client_secret: ssoClientSecret.trim()
+      });
+      await fetchAuthConfig();
+      setIsSettingsModalOpen(false);
+    } catch (e) {
+      alert('Failed to save SSO settings');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const fetchCourses = () => {
     setIsLoading(true);
@@ -113,12 +181,22 @@ export default function Dashboard() {
             <span className="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
               Reader <span className="text-emerald-400 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">LMS</span>
             </span>
-            <p className="text-[11px] text-slate-400">Interactive MDX & Karaoke TTS</p>
+            <p className="text-[11px] text-slate-400">Interactive MDX & Audio Narration</p>
           </div>
         </div>
 
         {/* User Status / Login */}
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleOpenSettings}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+            title="SSO Settings"
+          >
+            <SettingsIcon className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Settings</span>
+          </button>
+
           {user?.role === 'admin' && (
             <button
               type="button"
@@ -183,7 +261,7 @@ export default function Dashboard() {
               Course Library
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Select a course to start interactive reading with synchronized karaoke audio.
+              Select a course to start interactive reading with audio narration.
             </p>
           </div>
 
@@ -395,6 +473,131 @@ export default function Dashboard() {
               >
                 {isImporting ? 'Processing & Importing...' : 'Start Batch Import'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SSO Configuration Modal */}
+      {isSettingsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">CentralAuth SSO Switch</h3>
+                  <p className="text-[11px] text-slate-400">Toggle CentralAuth SSO vs Local Login</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSettingsModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSSOSettings} className="space-y-4">
+              {/* Enable / Disable Toggle Switch */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <label htmlFor="dashboardSsoSwitch" className="text-xs font-bold text-white block cursor-pointer">
+                    Enable CentralAuth SSO
+                  </label>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {ssoEnabled ? 'Logins redirect to inmind.site' : 'Logins stay on Reader locally'}
+                  </p>
+                </div>
+                <input
+                  id="dashboardSsoSwitch"
+                  type="checkbox"
+                  checked={ssoEnabled}
+                  onChange={(e) => setSsoEnabled(e.target.checked)}
+                  className="w-5 h-5 text-emerald-500 bg-slate-800 border-slate-700 rounded focus:ring-emerald-500 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  CentralAuth Server URL
+                </label>
+                <input
+                  type="url"
+                  value={ssoUrl}
+                  onChange={(e) => setSsoUrl(e.target.value)}
+                  placeholder="https://inmind.site"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                    Client ID
+                  </label>
+                  <input
+                    type="text"
+                    value={ssoClientId}
+                    onChange={(e) => setSsoClientId(e.target.value)}
+                    placeholder="reader-v1"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                    Client Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={ssoClientSecret}
+                    onChange={(e) => setSsoClientSecret(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Test Status Banner */}
+              {ssoTestStatus.status !== 'idle' && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-medium ${
+                    ssoTestStatus.status === 'success'
+                      ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300'
+                      : ssoTestStatus.status === 'error'
+                      ? 'bg-rose-500/10 border border-rose-500/20 text-rose-300'
+                      : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {ssoTestStatus.status === 'loading' && 'Testing connection to CentralAuth...'}
+                  {ssoTestStatus.status === 'success' && `✅ ${ssoTestStatus.message}`}
+                  {ssoTestStatus.status === 'error' && `❌ ${ssoTestStatus.message}`}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleTestSSO}
+                  disabled={ssoTestStatus.status === 'loading'}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer"
+                >
+                  Test Connection
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingSettings}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  {isSavingSettings ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

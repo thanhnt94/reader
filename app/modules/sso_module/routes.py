@@ -23,18 +23,30 @@ _HEALTH_CACHE = {"status": False, "ts": 0}
 
 def _check_host(host: str, port: int) -> bool:
     try:
-        with socket.create_connection((host, port), timeout=0.8):
+        with socket.create_connection((host, port), timeout=1.5):
             return True
     except Exception:
+        if "inmind.site" in host:
+            try:
+                with socket.create_connection(("inmind.site", port), timeout=1.5):
+                    return True
+            except Exception:
+                pass
         return False
 
 @router.get("/api/v1/auth/config")
 async def get_auth_config(db: AsyncSession = Depends(get_db)):
     """Public authentication configuration endpoint for pure SPA."""
     config = await SSOService.get_config(db)
-    server_url = config.server_url.rstrip("/") if config and config.server_url else settings.CENTRAL_AUTH_URL
+    raw_server_url = config.server_url.rstrip("/") if config and config.server_url else settings.CENTRAL_AUTH_URL
+    # Normalize auth.inmind.site to inmind.site if needed
+    if "auth.inmind.site" in raw_server_url:
+        raw_server_url = raw_server_url.replace("auth.inmind.site", "inmind.site")
+        config.server_url = raw_server_url
+        await db.commit()
+    server_url = raw_server_url
     
-    sso_active = config.is_enabled
+    sso_active = bool(config.is_enabled)
     if sso_active and server_url:
         import time
         now = time.time()
@@ -174,9 +186,35 @@ async def get_sso_config(db: AsyncSession = Depends(get_db)):
 @router.post("/api/sso/config")
 async def update_sso_config(data: dict, db: AsyncSession = Depends(get_db)):
     config = await SSOService.get_config(db)
-    config.is_enabled = data.get("is_enabled", config.is_enabled)
-    config.server_url = data.get("server_url", config.server_url)
-    config.client_id = data.get("client_id", config.client_id)
-    config.client_secret = data.get("client_secret", config.client_secret)
+    if "is_enabled" in data:
+        config.is_enabled = bool(data["is_enabled"])
+    if "server_url" in data and data["server_url"]:
+        raw_url = str(data["server_url"]).strip().rstrip("/")
+        if "auth.inmind.site" in raw_url:
+            raw_url = raw_url.replace("auth.inmind.site", "inmind.site")
+        config.server_url = raw_url
+    if "client_id" in data and data["client_id"]:
+        config.client_id = str(data["client_id"]).strip()
+    if "client_secret" in data and data["client_secret"]:
+        config.client_secret = str(data["client_secret"]).strip()
     await db.commit()
-    return {"success": True}
+    await db.refresh(config)
+    _HEALTH_CACHE["ts"] = 0
+    return {"success": True, "config": config.to_dict()}
+
+@router.post("/api/sso/test")
+async def test_sso_connection(data: dict = None, db: AsyncSession = Depends(get_db)):
+    config = await SSOService.get_config(db)
+    target_url = (data.get("server_url") if data else None) or config.server_url or settings.CENTRAL_AUTH_URL
+    target_url = target_url.strip().rstrip("/")
+    if "auth.inmind.site" in target_url:
+        target_url = target_url.replace("auth.inmind.site", "inmind.site")
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{target_url}/api/auth/health")
+            if resp.status_code == 200:
+                return {"status": "success", "message": "Connection to CentralAuth Successful!"}
+            return {"status": "error", "message": f"CentralAuth responded with status {resp.status_code}"}
+    except Exception as e:
+        return {"status": "error", "message": f"Connection failed: {str(e)}"}

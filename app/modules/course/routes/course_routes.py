@@ -273,11 +273,9 @@ async def _generate_lesson_tts_task(lesson_id: int):
             return
 
         try:
-            audio_url, timestamps_url, duration, timestamps = await TTSService.synthesize_lesson(lesson.id, lesson.raw_markdown)
+            audio_url = await TTSService.synthesize_lesson(db, lesson.id, lesson.raw_markdown)
             if audio_url:
                 lesson.audio_url = audio_url
-                lesson.timestamps_url = timestamps_url
-                lesson.duration_seconds = duration
                 lesson.tts_generated = True
                 await db.commit()
         except Exception as e:

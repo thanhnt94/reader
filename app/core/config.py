@@ -34,8 +34,8 @@ class Settings(BaseSettings):
 
     # CentralAuth SSO Integration
     SECRET_KEY: str = os.getenv("SECRET_KEY", "reader_inmind_secret_key_prod_2026_xyz987")
-    CENTRAL_AUTH_URL: str = os.getenv("CENTRAL_AUTH_URL", "https://auth.inmind.site")
-    CENTRALAUTH_INTERNAL_URL: str = os.getenv("CENTRALAUTH_INTERNAL_URL", "http://127.0.0.1:5050")
+    CENTRAL_AUTH_URL: str = os.getenv("CENTRAL_AUTH_URL", "https://inmind.site")
+    CENTRALAUTH_INTERNAL_URL: str = os.getenv("CENTRALAUTH_INTERNAL_URL", "https://inmind.site")
     CENTRALAUTH_QUEUE_TOKEN: str = os.getenv("CENTRALAUTH_QUEUE_TOKEN", "super-secret-token-123")
     CLIENT_ID: str = os.getenv("CLIENT_ID", "reader-v1")
     CLIENT_SECRET: str = os.getenv("CLIENT_SECRET", "reader_secret_123")

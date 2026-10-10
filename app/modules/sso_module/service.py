@@ -28,10 +28,17 @@ class SSOService:
         if not config.is_enabled:
             raise HTTPException(status_code=400, detail="SSO is disabled locally")
 
-        # Prioritize internal URL if available for speed and reliability
-        candidate_urls = [config.server_url]
-        if settings.CENTRALAUTH_INTERNAL_URL and settings.CENTRALAUTH_INTERNAL_URL != config.server_url:
-            candidate_urls.insert(0, settings.CENTRALAUTH_INTERNAL_URL)
+        # Prioritize normalized server URL and https://inmind.site
+        candidate_urls = []
+        if config.server_url:
+            raw_url = config.server_url.rstrip("/")
+            if "auth.inmind.site" in raw_url:
+                raw_url = raw_url.replace("auth.inmind.site", "inmind.site")
+            candidate_urls.append(raw_url)
+        if "https://inmind.site" not in candidate_urls:
+            candidate_urls.append("https://inmind.site")
+        if settings.CENTRALAUTH_INTERNAL_URL and settings.CENTRALAUTH_INTERNAL_URL not in candidate_urls:
+            candidate_urls.append(settings.CENTRALAUTH_INTERNAL_URL)
 
         last_error = None
         for base_url in candidate_urls:

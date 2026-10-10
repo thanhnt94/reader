@@ -21,7 +21,7 @@ import {
 import confetti from 'canvas-confetti';
 import { readerApi, Lesson, Course } from '../lib/api/readerApi';
 import { MarkdownRenderer } from '../components/mdx/MarkdownRenderer';
-import { KaraokeAudioPlayer, TimestampItem } from '../components/player/KaraokeAudioPlayer';
+import { AudioPlayer } from '../components/player/AudioPlayer';
 import { useAppStore } from '../store/useAppStore';
 
 export default function LessonReader() {
@@ -38,9 +38,6 @@ export default function LessonReader() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTOCOpen, setIsTOCOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-
-  // Active Karaoke State
-  const [activeSentence, setActiveSentence] = useState<TimestampItem | null>(null);
 
   // Active Heading (Scrollspy)
   const [activeHeadingId, setActiveHeadingId] = useState<string>('');
@@ -368,7 +365,6 @@ export default function LessonReader() {
             {/* Markdown Body */}
             <MarkdownRenderer
               content={lesson.raw_markdown || ''}
-              activeSentenceText={activeSentence?.text}
               fontSize={settings.font_size}
               lineSpacing={settings.line_spacing}
             />
@@ -487,14 +483,12 @@ export default function LessonReader() {
         </>
       )}
 
-      {/* Docked Karaoke Audio Player */}
+      {/* Docked Audio Player */}
       {lesson.audio_url && (
-        <KaraokeAudioPlayer
+        <AudioPlayer
           audioUrl={lesson.audio_url}
-          timestampsUrl={lesson.timestamps_url}
+          title={lesson.title}
           duration={lesson.duration_seconds}
-          onSentenceChange={(s) => setActiveSentence(s)}
-          autoScroll={settings.auto_scroll}
         />
       )}
     </div>

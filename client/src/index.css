@@ -33,16 +33,6 @@ html, body, #root {
   background: rgba(148, 163, 184, 0.4);
 }
 
-/* Karaoke Read-Along Active Animation */
-.karaoke-active {
-  background: rgba(245, 158, 11, 0.18) !important;
-  color: #fef3c7 !important;
-  border-left: 3px solid #f59e0b !important;
-  padding-left: 0.5rem;
-  border-radius: 0 0.375rem 0.375rem 0;
-  transition: all 0.25s ease-in-out;
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.1);
-}
 
 /* Japanese Ruby Furigana Enhancements */
 ruby {

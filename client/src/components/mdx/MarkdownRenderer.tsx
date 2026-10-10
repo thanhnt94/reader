@@ -75,16 +75,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             );
           },
 
-          // Paragraphs & Karaoke Sentence Highlight
+          // Paragraphs
           p({ children, ...props }: any) {
-            const pText = typeof children === 'string' ? children : '';
-            const isKaraokeActive = activeSentenceText && pText && pText.includes(activeSentenceText.slice(0, 15));
-
             return (
-              <p
-                className={`my-3.5 transition-all duration-200 ${isKaraokeActive ? 'karaoke-active' : ''}`}
-                {...props}
-              >
+              <p className="my-3.5 leading-relaxed" {...props}>
                 {children}
               </p>
             );

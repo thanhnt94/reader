@@ -1,11 +1,16 @@
 import os
 import re
-import json
-import asyncio
 import hashlib
+import logging
+from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
 import edge_tts
-from typing import List, Dict, Any, Tuple
+
 from app.core.config import settings
+from app.modules.sso_module.service import SSOService
+
+logger = logging.getLogger(__name__)
 
 class TTSService:
     VOICES = {
@@ -15,14 +20,14 @@ class TTSService:
     }
 
     @classmethod
-    def clean_markdown_for_tts(cls, md: str) -> List[str]:
-        """Cleans markdown text into readable sentences/paragraphs."""
+    def clean_markdown_for_tts(cls, md: str) -> str:
+        """Cleans markdown text into readable narration prose."""
         if not md:
-            return []
+            return ""
 
         # 1. Remove YAML frontmatter
         clean = re.sub(r'^---\s*[\s\S]*?---\s*', '', md)
-        
+
         # 2. Remove code blocks and inline code
         clean = re.sub(r'```[\s\S]*?```', '', clean)
         clean = re.sub(r'`[^`\n]+`', '', clean)
@@ -33,9 +38,9 @@ class TTSService:
 
         # 4. Handle Japanese Ruby tags: replace <ruby>漢字<rt>かんじ</rt></ruby> with 漢字
         clean = re.sub(r'<ruby>([^<]+)<rt>[^<]*</rt></ruby>', r'\1', clean)
-        clean = re.sub(r'<[^>]+>', '', clean)  # Strip any remaining HTML tags
+        clean = re.sub(r'<[^>]+>', '', clean)  # Strip remaining HTML tags
 
-        # 5. Remove images and adjust links
+        # 5. Remove images and keep link anchor texts
         clean = re.sub(r'!\[.*?\]\(.*?\)', '', clean)
         clean = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', clean)
 
@@ -55,36 +60,17 @@ class TTSService:
         # 9. Remove emphasis & bold markers
         clean = re.sub(r'[*_~]', '', clean)
 
-        # Split into meaningful sentences or paragraphs
+        # 10. Normalize multiple whitespaces and empty lines
         lines = [line.strip() for line in clean.split('\n') if line.strip()]
-        sentences = []
-        for line in lines:
-            # Split line by sentence terminators (Japanese 。！？ and Western .!?)
-            parts = re.split(r'([。！？.!?]+)', line)
-            current = ""
-            for i in range(0, len(parts), 2):
-                seg = parts[i].strip()
-                punct = parts[i+1].strip() if i+1 < len(parts) else ""
-                combined = (seg + punct).strip()
-                if combined:
-                    if len(combined) > 4:
-                        sentences.append(combined)
-                    else:
-                        if sentences:
-                            sentences[-1] += " " + combined
-                        else:
-                            sentences.append(combined)
-        return sentences
+        return "\n\n".join(lines)
 
     @classmethod
     def detect_language(cls, text: str) -> str:
-        """Detects if sentence is primarily Japanese, Vietnamese, or English."""
-        # Japanese characters: Hiragana, Katakana, Kanji
+        """Detects if text is Japanese, Vietnamese, or English."""
         jp_chars = len(re.findall(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', text))
-        if jp_chars > 0 and (jp_chars / max(len(text), 1)) > 0.15:
+        if jp_chars > 0 and (jp_chars / max(len(text), 1)) > 0.12:
             return "ja"
-        
-        # Vietnamese tone accents
+
         vi_chars = len(re.findall(r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]', text, re.IGNORECASE))
         if vi_chars > 0:
             return "vi"
@@ -92,102 +78,68 @@ class TTSService:
         return "en"
 
     @classmethod
-    async def synthesize_lesson(cls, lesson_id: int, markdown_text: str) -> Tuple[str, str, float, List[Dict[str, Any]]]:
+    async def synthesize_lesson(cls, db: AsyncSession, lesson_id: int, markdown_text: str) -> Optional[str]:
         """
-        Synthesizes lesson audio and generates word/sentence timestamps for Karaoke.
-        Returns: (audio_url, timestamps_url, duration, timestamps)
+        Synthesizes lesson audio narration.
+        Synchronizes via CentralAuth if SSO is enabled; otherwise generates locally via edge-tts.
+        Returns: audio_url (string) or None if synthesis failed.
         """
-        sentences = cls.clean_markdown_for_tts(markdown_text)
-        if not sentences:
-            return "", "", 0.0, []
+        clean_text = cls.clean_markdown_for_tts(markdown_text)
+        if not clean_text:
+            return None
 
-        os.makedirs(settings.AUDIO_DIR, exist_ok=True)
-        
-        content_hash = hashlib.md5(markdown_text.encode('utf-8')).hexdigest()[:12]
-        base_filename = f"lesson_{lesson_id}_{content_hash}"
-        audio_filename = f"{base_filename}.mp3"
-        json_filename = f"{base_filename}_timestamps.json"
-        
-        audio_path = os.path.join(settings.AUDIO_DIR, audio_filename)
-        json_path = os.path.join(settings.AUDIO_DIR, json_filename)
+        lang = cls.detect_language(clean_text)
+        sso_config = await SSOService.get_config(db)
 
-        # Check if already generated
-        if os.path.exists(audio_path) and os.path.exists(json_path):
-            with open(json_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                duration = data[-1]["end"] if data else 0.0
-                return f"/uploads/audio/{audio_filename}", f"/uploads/audio/{json_filename}", duration, data
+        # 1. CentralAuth Synchronized TTS if Central SSO is enabled
+        if sso_config and sso_config.is_enabled and sso_config.server_url:
+            server_url = sso_config.server_url.rstrip("/")
+            if "auth.inmind.site" in server_url:
+                server_url = server_url.replace("auth.inmind.site", "inmind.site")
 
-        temp_files = []
-        timestamps = []
-        current_time = 0.0
-
-        import tempfile
-        from pydub import AudioSegment
-
-        for idx, sentence in enumerate(sentences):
-            lang = cls.detect_language(sentence)
-            voice = cls.VOICES.get(lang, cls.VOICES["vi"])
-
-            fd, temp_seg_path = tempfile.mkstemp(suffix=f"_seg_{idx}.mp3")
-            os.close(fd)
-
+            logger.info(f"[TTS CENTRAL] Requesting CentralAuth TTS for lesson {lesson_id} (lang: {lang}) from {server_url}")
             try:
-                communicate = edge_tts.Communicate(sentence, voice)
-                await communicate.save(temp_seg_path)
-                
-                # Read duration via pydub
-                seg_audio = AudioSegment.from_file(temp_seg_path)
-                seg_duration = len(seg_audio) / 1000.0  # in seconds
+                # Try candidate URLs (external URL or unix socket)
+                async with httpx.AsyncClient(timeout=45.0) as client:
+                    tts_payload = {
+                        "text": clean_text,
+                        "app": "reader",
+                        "folder": str(lesson_id),
+                        "subfolder": "audio",
+                        "lang": lang,
+                        "bypass_parsing": True
+                    }
+                    resp = await client.post(
+                        f"{server_url}/api/tts/generate",
+                        json=tts_payload
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        rel_url = data.get("url", "")
+                        resolved_url = f"{server_url}{rel_url}" if rel_url.startswith("/") else rel_url
+                        logger.info(f"[TTS CENTRAL SUCCESS] Synced audio URL: {resolved_url}")
+                        return resolved_url
+                    else:
+                        logger.warning(f"[TTS CENTRAL ERROR] CentralAuth TTS status {resp.status_code}: {resp.text}")
+            except Exception as ca_err:
+                logger.warning(f"[TTS CENTRAL WARNING] CentralAuth TTS request failed, falling back to local: {ca_err}")
 
-                start_time = round(current_time, 2)
-                end_time = round(current_time + seg_duration, 2)
+        # 2. Local Fallback Synthesis via Edge-TTS
+        try:
+            os.makedirs(settings.AUDIO_DIR, exist_ok=True)
+            voice = cls.VOICES.get(lang, cls.VOICES["vi"])
+            content_hash = hashlib.md5(f"{lesson_id}_{clean_text}".encode('utf-8')).hexdigest()[:12]
+            filename = f"lesson_{lesson_id}_{content_hash}.mp3"
+            audio_path = os.path.join(settings.AUDIO_DIR, filename)
 
-                timestamps.append({
-                    "id": f"s-{idx}",
-                    "sentence_idx": idx,
-                    "start": start_time,
-                    "end": end_time,
-                    "lang": lang,
-                    "text": sentence
-                })
+            if not os.path.exists(audio_path):
+                logger.info(f"[TTS LOCAL] Synthesizing audio locally with voice {voice}")
+                communicate = edge_tts.Communicate(clean_text, voice)
+                await communicate.save(audio_path)
 
-                temp_files.append(temp_seg_path)
-                current_time = end_time + 0.3  # 300ms pause between sentences
-            except Exception as e:
-                if os.path.exists(temp_seg_path):
-                    os.remove(temp_seg_path)
-                continue
-
-        if not temp_files:
-            return "", "", 0.0, []
-
-        # Merge segments using pydub
-        combined = AudioSegment.empty()
-        pause = AudioSegment.silent(duration=300)
-
-        for i, tf in enumerate(temp_files):
-            seg_audio = AudioSegment.from_file(tf)
-            if i > 0:
-                combined += pause
-            combined += seg_audio
-
-        combined.export(audio_path, format="mp3")
-        total_duration = round(len(combined) / 1000.0, 2)
-
-        # Clean temp files
-        for tf in temp_files:
-            if os.path.exists(tf):
-                try:
-                    os.remove(tf)
-                except Exception:
-                    pass
-
-        # Write timestamps JSON
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(timestamps, f, ensure_ascii=False, indent=2)
-
-        audio_url = f"/uploads/audio/{audio_filename}"
-        timestamps_url = f"/uploads/audio/{json_filename}"
-
-        return audio_url, timestamps_url, total_duration, timestamps
+            local_url = f"/uploads/audio/{filename}"
+            logger.info(f"[TTS LOCAL SUCCESS] Generated local audio: {local_url}")
+            return local_url
+        except Exception as local_err:
+            logger.error(f"[TTS ERROR] Local synthesis failed: {local_err}")
+            return None
