@@ -97,17 +97,22 @@ export default function CourseDashboard() {
     return uncompleted || allLessons[0];
   }, [allLessons]);
 
-  // JSST Missing Questions Analysis (from 1 to 87)
+  // JSST Syllabus Question Completeness Analysis (from 1 to 87)
   const missingAnalysis = useMemo(() => {
     if (!course || course.slug !== 'jsst') return null;
 
     const foundNums = new Set<number>();
     allLessons.forEach((l) => {
-      const numMatches = l.title.match(/\b\d+\b/) || l.slug.match(/\d+/g);
-      if (numMatches) {
-        const n = parseInt(numMatches[0], 10);
-        if (n >= 1 && n <= 87) {
-          foundNums.add(n);
+      const matchTitle = l.title.match(/Câu\s*(\d+)/i);
+      const matchSlug = l.slug.match(/-o(\d+)-/);
+      if (matchTitle) {
+        foundNums.add(parseInt(matchTitle[1], 10));
+      } else if (matchSlug) {
+        foundNums.add(parseInt(matchSlug[1], 10));
+      } else {
+        const fallback = l.title.match(/\b\d+\b/) || l.slug.match(/\d+/g);
+        if (fallback) {
+          foundNums.add(parseInt(fallback[0], 10));
         }
       }
     });
@@ -346,6 +351,28 @@ export default function CourseDashboard() {
             </div>
           </div>
         </section>
+
+        {/* Full Syllabus Complete Banner */}
+        {missingAnalysis && missingAnalysis.missingList.length === 0 && (
+          <section className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-4 backdrop-blur-md flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                <Check className="w-4 h-4 stroke-[3]" />
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-bold text-emerald-300">
+                  Full Syllabus Active (87 / 87 Questions)
+                </h3>
+                <p className="text-[11px] text-emerald-400/80">
+                  All 87 Japanese Speaking Skill Test questions are synchronized and ready to study.
+                </p>
+              </div>
+            </div>
+            <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold font-mono">
+              100% Complete
+            </span>
+          </section>
+        )}
 
         {/* Missing Questions Notification (For JSST Course) */}
         {missingAnalysis && missingAnalysis.missingList.length > 0 && (

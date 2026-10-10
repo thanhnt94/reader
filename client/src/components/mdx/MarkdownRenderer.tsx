@@ -171,11 +171,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             );
           },
 
-          // Table styling
+          // Table styling with mobile responsiveness
           table({ children }: any) {
             return (
-              <div className="my-6 overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
-                <table className="w-full text-left border-collapse text-sm text-slate-300">
+              <div className="my-5 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/50 shadow-sm -mx-2 sm:mx-0">
+                <table className="w-full min-w-[320px] text-left border-collapse text-xs sm:text-sm text-slate-300">
                   {children}
                 </table>
               </div>
@@ -183,18 +183,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           },
           th({ children }: any) {
             return (
-              <th className="px-4 py-3 bg-slate-800/60 font-semibold text-slate-200 border-b border-slate-800 text-xs uppercase tracking-wider">
+              <th className="px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-800/80 font-bold text-slate-200 border-b border-slate-800 text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap">
                 {children}
               </th>
             );
           },
           td({ children }: any) {
             return (
-              <td className="px-4 py-3 border-b border-slate-800/60 text-xs sm:text-sm">
+              <td className="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-800/60 text-xs sm:text-sm leading-relaxed">
                 {children}
               </td>
             );
           },
+
+          // Language tagging helpers
+          ja: ({ children }: any) => <span lang="ja" className="font-medium text-slate-100">{children}</span>,
+          vi: ({ children }: any) => <span lang="vi">{children}</span>,
 
           // Interactive Components
           vocabcard: (props: any) => <VocabCard {...props} />,

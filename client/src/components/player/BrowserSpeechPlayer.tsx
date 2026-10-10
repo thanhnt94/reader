@@ -6,11 +6,9 @@ import {
   SkipBack,
   SkipForward,
   Volume2,
-  VolumeX,
   X,
   Languages,
-  Sparkles,
-  ChevronDown
+  Sparkles
 } from 'lucide-react';
 
 export type DetectedLang = 'ja-JP' | 'vi-VN' | 'en-US';
@@ -22,8 +20,41 @@ export interface SpeechSentence {
 }
 
 /**
+ * Analyzes character distribution and vocabulary clues to identify Japanese vs Vietnamese vs English.
+ */
+export function detectLanguage(text: string): DetectedLang {
+  const trimmed = text.trim();
+  if (!trimmed) return 'en-US';
+
+  // 1. Japanese Kanji, Hiragana, Katakana check
+  const jaMatches = trimmed.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g);
+  const jaCount = jaMatches ? jaMatches.length : 0;
+
+  // 2. Vietnamese explicit accented letters check
+  const viMatches = trimmed.match(
+    /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]/g
+  );
+  const viCount = viMatches ? viMatches.length : 0;
+
+  // 3. Common Vietnamese unaccented words or labels (like "Cau", "Dich", "Buoc", "Bai")
+  const hasViKeywords = /\b(câu|bài|bước|dịch|nghĩa|tiếng|ví dụ|hỏi|đáp|trả lời|dàn ý|từ vựng)\b/i.test(trimmed);
+
+  if (jaCount > 0 && jaCount >= viCount && !hasViKeywords) {
+    return 'ja-JP';
+  }
+  if (viCount > 0 || hasViKeywords) {
+    return 'vi-VN';
+  }
+  if (jaCount > 0) {
+    return 'ja-JP';
+  }
+  return 'en-US';
+}
+
+/**
  * Strips HTML tags, removes <rt>...</rt> ruby annotations, cleans markdown formatting,
- * and splits into natural speech sentences.
+ * processes tables cell-by-cell, separates mixed language sentences,
+ * and splits into natural speech sentences with accurate language tags.
  */
 export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
   if (!rawMarkdown) return [];
@@ -38,71 +69,150 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
   text = text.replace(/`[^`]+`/g, '');
 
   // 3. Remove Japanese Ruby Furigana annotations (<rt>...</rt> and <rp>...</rp>)
-  // This prevents the browser voice from repeating both Kanji and Furigana pronunciation
+  // Stripping Furigana prevents duplicate pronunciation of both Kanji and Kana
   text = text.replace(/<rt[^>]*>[\s\S]*?<\/rt>/gi, '');
   text = text.replace(/<rp[^>]*>[\s\S]*?<\/rp>/gi, '');
 
-  // 4. Remove all remaining HTML tags
-  text = text.replace(/<[^>]+>/g, ' ');
-
-  // 5. Clean Markdown Tables: remove separator lines like | :--- | :--- |
-  text = text.replace(/\|[\s:-\|]+\|/g, '');
-  text = text.replace(/\|/g, ', ');
-
-  // 6. Clean Markdown Syntax:
-  text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, ''); // images
-  text = text.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'); // links
-  text = text.replace(/>\s*\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\]/gi, ''); // GitHub alerts
-  text = text.replace(/^>\s*/gm, ''); // blockquotes
-  text = text.replace(/^#{1,6}\s+/gm, ''); // headers
-  text = text.replace(/[*_~]{1,3}/g, ''); // bold, italics, strikethrough
-  text = text.replace(/^\s*[-*+]\s+/gm, ''); // bullets
-  text = text.replace(/^\s*\d+\.\s+/gm, ''); // numbered lists
-
-  // 7. Remove non-speech emojis / decorative symbols
-  text = text.replace(/[📌⚡💡💬➡/]/g, ' ');
-
-  // 8. Split by punctuation: Japanese (。！？) and Latin (.!?) and newlines
-  const rawSegments = text.split(/(?<=[。！？.!?\n])\s+/);
-
+  // 4. Extract explicit language tags if user used <ja>...</ja> or <vi>...</vi>
+  // We'll preserve them by marker replacement or processing
+  const lines = text.split('\n');
   const sentences: SpeechSentence[] = [];
   let idx = 0;
 
-  for (const seg of rawSegments) {
-    const trimmed = seg.trim();
-    // Exclude noise, horizontal rules, or single punctuation
-    if (trimmed.length > 1 && !/^[-_—\s,.]+$/.test(trimmed)) {
-      const lang = detectLanguage(trimmed);
+  const pushSentence = (str: string, forcedLang?: DetectedLang) => {
+    const cleaned = str
+      .replace(/<[^>]+>/g, '') // remove remaining HTML tags
+      .replace(/[*_~]{1,3}/g, '') // remove bold/italics
+      .replace(/[📌⚡💡💬➡/]/g, ' ') // decorative symbols
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (cleaned.length > 0 && !/^[-_—\s,.:;|]+$/.test(cleaned)) {
+      const lang = forcedLang || detectLanguage(cleaned);
       sentences.push({
         index: idx++,
-        text: trimmed,
+        text: cleaned,
         lang,
       });
+    }
+  };
+
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+
+    // Check if line is a Markdown Table row: e.g. | Bước | Tiếng Việt | Tiếng Nhật |
+    if (line.startsWith('|') && line.endsWith('|')) {
+      // Skip separator rows like | :--- | :--- |
+      if (/^\|[\s:-\|]+\|$/.test(line)) {
+        continue;
+      }
+      // Extract cells
+      const cells = line
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim());
+
+      // If it's a table header with generic column names like ["Bước", "Tiếng Việt", "Tiếng Nhật"], skip
+      const isHeaderRow = cells.every((c) =>
+        /^(bước|tiếng việt|tiếng nhật|stt|no|nghĩa|kanji|furigana)$/i.test(c.replace(/[*_~]/g, ''))
+      );
+      if (isHeaderRow) {
+        continue;
+      }
+
+      // Read each non-empty data cell individually with its own detected language
+      for (const cell of cells) {
+        // Strip inline tags
+        const cellClean = cell.replace(/<rt[^>]*>[\s\S]*?<\/rt>/gi, '').replace(/<[^>]+>/g, '');
+        pushSentence(cellClean);
+      }
+      continue;
+    }
+
+    // Clean markdown headings, blockquotes, list markers
+    line = line.replace(/^#{1,6}\s+/, '');
+    line = line.replace(/^>\s*/, '');
+    line = line.replace(/^\s*[-*+]\s+/, '');
+    line = line.replace(/^\s*\d+\.\s+/, '');
+
+    // Check for explicit <ja>...</ja> or <vi>...</vi> tags
+    if (/<ja>[\s\S]*?<\/ja>/i.test(line) || /<vi>[\s\S]*?<\/vi>/i.test(line)) {
+      // Split on tags
+      const tagSegments = line.split(/(<ja>[\s\S]*?<\/ja>|<vi>[\s\S]*?<\/vi>)/gi);
+      for (const seg of tagSegments) {
+        if (/^<ja>([\s\S]*?)<\/ja>$/i.test(seg)) {
+          const match = seg.match(/^<ja>([\s\S]*?)<\/ja>$/i);
+          if (match && match[1]) pushSentence(match[1], 'ja-JP');
+        } else if (/^<vi>([\s\S]*?)<\/vi>$/i.test(seg)) {
+          const match = seg.match(/^<vi>([\s\S]*?)<\/vi>$/i);
+          if (match && match[1]) pushSentence(match[1], 'vi-VN');
+        } else {
+          pushSentence(seg);
+        }
+      }
+      continue;
+    }
+
+    // Check for mixed prefixes like:
+    // "Câu 04: 家族と一緒に住んでいますか..."
+    // "Dịch câu hỏi: Bạn thích mùa nào..."
+    // "Tiếng Nhật: 四季の中で..."
+    const prefixMatch = line.match(
+      /^((?:[Cc]âu\s*\d+|[Dd]ịch\s*câu\s*hỏi|[Dd]ịch\s*nghĩa|[Tt]iếng\s*[Nn]hật|[Tt]iếng\s*[Vv]iệt|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý)[\s:.-]*)(.*)$/i
+    );
+    if (prefixMatch) {
+      const prefix = prefixMatch[1].trim();
+      const rest = prefixMatch[2].trim();
+      if (prefix) pushSentence(prefix, 'vi-VN');
+      if (rest) {
+        // Split rest if it contains punctuation
+        const subParts = rest.split(/([。！？.!?]+)/);
+        let cur = '';
+        for (const sp of subParts) {
+          if (/^[。！？.!?]+$/.test(sp)) {
+            cur += sp;
+            if (cur.trim()) pushSentence(cur.trim());
+            cur = '';
+          } else {
+            cur += sp;
+          }
+        }
+        if (cur.trim()) pushSentence(cur.trim());
+      }
+      continue;
+    }
+
+    // Check if line is a vocabulary or comparison line with arrows (➡) or colons
+    // e.g. "四季: bốn mùa ➡ 一年の中: trong năm"
+    if (line.includes('➡') || (line.includes(':') && line.includes('ruby'))) {
+      const parts = line.split(/[➡:]/);
+      for (const p of parts) {
+        pushSentence(p);
+      }
+      continue;
+    }
+
+    // General sentence splitting without regex lookbehinds (for older iOS/WebKit engines)
+    const punctuationSplit = line.split(/([。！？.!?]+)/);
+    let buffer = '';
+    for (const part of punctuationSplit) {
+      if (/^[。！？.!?]+$/.test(part)) {
+        buffer += part;
+        if (buffer.trim()) {
+          pushSentence(buffer.trim());
+        }
+        buffer = '';
+      } else {
+        buffer += part;
+      }
+    }
+    if (buffer.trim()) {
+      pushSentence(buffer.trim());
     }
   }
 
   return sentences;
-}
-
-/**
- * Analyzes character distribution to identify Japanese vs Vietnamese vs English.
- */
-export function detectLanguage(text: string): DetectedLang {
-  const jaMatches = text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g);
-  const jaCount = jaMatches ? jaMatches.length : 0;
-
-  const viMatches = text.match(
-    /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]/g
-  );
-  const viCount = viMatches ? viMatches.length : 0;
-
-  if (jaCount > 0 && jaCount >= viCount) {
-    return 'ja-JP';
-  }
-  if (viCount > 0) {
-    return 'vi-VN';
-  }
-  return 'en-US';
 }
 
 interface BrowserSpeechPlayerProps {
@@ -127,7 +237,6 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const synthRef = useRef<SpeechSynthesis | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Initialize SpeechSynthesis and load browser voices
   useEffect(() => {
@@ -222,20 +331,14 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     };
 
     utterance.onerror = (e) => {
-      console.warn('Speech synthesis error:', e);
-      if (index + 1 < activeSentences.length) {
-        setCurrentIndex(index + 1);
-        speakSentence(index + 1);
-      } else {
-        setIsPlaying(false);
-        setIsPaused(false);
-      }
+      console.warn('SpeechSynthesis error:', e);
+      setIsPlaying(false);
+      setIsPaused(false);
     };
 
-    utteranceRef.current = utterance;
-    synthRef.current.speak(utterance);
     setIsPlaying(true);
     setIsPaused(false);
+    synthRef.current.speak(utterance);
   };
 
   const handlePlay = () => {
@@ -291,30 +394,27 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-4 inset-x-4 max-w-3xl mx-auto z-40 animate-in slide-in-from-bottom duration-300 font-sans">
-      <div className="bg-slate-900/95 border border-slate-700/80 rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-2xl text-slate-100 flex flex-col gap-3">
+    <div className="fixed bottom-2 inset-x-2 sm:bottom-4 sm:inset-x-4 max-w-3xl mx-auto z-50 animate-in slide-in-from-bottom duration-300 font-sans">
+      <div className="bg-slate-900/95 border border-slate-700/80 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xl backdrop-blur-2xl text-slate-100 flex flex-col gap-2.5 sm:gap-3">
         {/* Header Bar */}
-        <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-800">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-              <Volume2 className="w-4 h-4" />
+        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-xs text-white truncate">{title}</span>
-                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-semibold text-emerald-400 border border-slate-700/60 shrink-0">
-                  Browser TTS
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-xs text-white truncate max-w-[120px] sm:max-w-xs">{title}</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-[9px] sm:text-[10px] font-semibold text-emerald-400 border border-slate-700/60 shrink-0">
+                  Multilingual TTS
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 truncate">
-                Native Speech Engine • Auto-detecting Language & Clean Furigana
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             {/* Filter Mode Selector */}
-            <div className="flex rounded-xl bg-slate-800 p-0.5 text-[11px] font-semibold">
+            <div className="flex rounded-xl bg-slate-800 p-0.5 text-[10px] sm:text-[11px] font-semibold">
               <button
                 type="button"
                 onClick={() => {
@@ -341,7 +441,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                 }`}
                 title="Read Japanese sentences only"
               >
-                🇯🇵 Japanese Only
+                🇯🇵 <span className="hidden sm:inline">Japanese</span>
               </button>
               <button
                 type="button"
@@ -355,7 +455,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                 }`}
                 title="Read Vietnamese sentences only"
               >
-                🇻🇳 Vietnamese Only
+                🇻🇳 <span className="hidden sm:inline">Vietnamese</span>
               </button>
             </div>
 
@@ -365,7 +465,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                 handleStop();
                 onClose();
               }}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
+              className="p-1 sm:p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -373,13 +473,13 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
         </div>
 
         {/* Live Active Sentence Display */}
-        <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 min-h-[56px] flex flex-col justify-center">
+        <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-slate-950/60 border border-slate-800/80 min-h-[50px] sm:min-h-[56px] flex flex-col justify-center">
           {currentSentence ? (
             <div className="space-y-1">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
+              <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <span
-                    className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-bold ${
+                    className={`px-1.5 py-0.2 rounded-md font-mono text-[9px] sm:text-[10px] font-bold ${
                       currentSentence.lang === 'ja-JP'
                         ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                         : currentSentence.lang === 'vi-VN'
@@ -393,9 +493,11 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                       ? '🇻🇳 Vietnamese'
                       : '🇺🇸 English'}
                   </span>
-                  <span>Sentence {currentIndex + 1} of {activeSentences.length}</span>
+                  <span>
+                    #{currentIndex + 1} / {activeSentences.length}
+                  </span>
                 </span>
-                <span className="text-[10px] text-slate-500">
+                <span className="text-[9px] sm:text-[10px] text-slate-500">
                   {isPlaying ? 'Speaking...' : isPaused ? 'Paused' : 'Ready'}
                 </span>
               </div>
@@ -404,21 +506,21 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
               </p>
             </div>
           ) : (
-            <div className="text-center text-xs text-slate-500 py-2">
+            <div className="text-center text-xs text-slate-500 py-1.5">
               No speech sentences found in this article.
             </div>
           )}
         </div>
 
         {/* Playback Controls & Speed */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2">
           {/* Main Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handlePrev}
               disabled={currentIndex <= 0}
-              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
               title="Previous Sentence"
             >
               <SkipBack className="w-4 h-4" />
@@ -428,20 +530,20 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
               <button
                 type="button"
                 onClick={handlePause}
-                className="w-10 h-10 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
                 title="Pause"
               >
-                <Pause className="w-5 h-5 fill-current" />
+                <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handlePlay}
                 disabled={activeSentences.length === 0}
-                className="w-10 h-10 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-600/30 transition-all cursor-pointer disabled:opacity-40"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-600/30 transition-all cursor-pointer disabled:opacity-40"
                 title="Play Audio"
               >
-                <Play className="w-5 h-5 fill-current ml-0.5" />
+                <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
               </button>
             )}
 
@@ -449,7 +551,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
               type="button"
               onClick={handleNext}
               disabled={currentIndex >= activeSentences.length - 1}
-              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
               title="Next Sentence"
             >
               <SkipForward className="w-4 h-4" />
@@ -458,7 +560,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
             <button
               type="button"
               onClick={handleStop}
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
               title="Stop"
             >
               <Square className="w-4 h-4" />
@@ -466,14 +568,14 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
           </div>
 
           {/* Speed Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl text-[11px] font-bold">
-            <span className="text-slate-400 px-1 text-[10px] uppercase">Speed:</span>
+          <div className="flex items-center gap-1 bg-slate-800/80 p-0.5 sm:p-1 rounded-xl text-[10px] sm:text-[11px] font-bold">
+            <span className="text-slate-400 px-1 text-[9px] uppercase hidden xs:inline">Speed:</span>
             {[0.8, 1.0, 1.25, 1.5].map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => handleSpeedChange(s)}
-                className={`px-2 py-0.5 rounded-lg transition-colors cursor-pointer ${
+                className={`px-1.5 sm:px-2 py-0.5 rounded-lg transition-colors cursor-pointer ${
                   speed === s ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
                 }`}
               >

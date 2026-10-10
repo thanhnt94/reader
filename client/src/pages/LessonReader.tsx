@@ -539,6 +539,68 @@ export default function LessonReader() {
           duration={lesson.duration_seconds}
         />
       )}
+
+      {/* Mobile Docked Bottom Action Bar (Thumb Reachable) */}
+      <div className="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 border-t border-slate-800 backdrop-blur-xl px-2 py-1.5 flex items-center justify-around lg:hidden shadow-2xl">
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen(true)}
+          className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
+        >
+          <Menu className="w-4 h-4" />
+          <span className="text-[10px] font-medium">Lessons</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsSpeechPlayerOpen(!isSpeechPlayerOpen)}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-colors cursor-pointer ${
+            isSpeechPlayerOpen ? 'text-emerald-400 font-bold' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Volume2 className="w-4 h-4" />
+          <span className="text-[10px] font-medium">Speech</span>
+        </button>
+
+        {lesson.toc_data && lesson.toc_data.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setIsTOCOpen(true)}
+            className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <ListTree className="w-4 h-4" />
+            <span className="text-[10px] font-medium">Outline</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleToggleComplete}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-colors cursor-pointer ${
+            isCompleted ? 'text-emerald-400 font-bold' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <BookmarkCheck className="w-4 h-4" />
+          <span className="text-[10px] font-medium">{isCompleted ? 'Done' : 'Mark'}</span>
+        </button>
+
+        {nextLesson && (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                course
+                  ? `/courses/${course.slug || course.id}/${nextLesson.slug || nextLesson.id}`
+                  : `/reader/${nextLesson.id}`
+              )
+            }
+            className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer font-bold"
+          >
+            <ChevronRight className="w-4 h-4" />
+            <span className="text-[10px] font-medium">Next</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
