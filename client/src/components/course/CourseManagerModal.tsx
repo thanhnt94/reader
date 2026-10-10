@@ -862,7 +862,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                                   <div className="flex items-center gap-2 shrink-0">
                                     <button
                                       type="button"
-                                      onClick={() => navigate(`/reader/${lesson.id}`)}
+                                      onClick={() => navigate(course ? `/courses/${course.slug || course.id}/${lesson.slug || lesson.id}` : `/reader/${lesson.id}`)}
                                       className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
                                     >
                                       <span>Read</span>

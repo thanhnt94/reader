@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Reader API",
-    description="File-driven LMS Platform with Interactive MDX, Karaoke TTS & CentralAuth SSO",
+    description="File-driven LMS Platform with Interactive MDX, Audio Narration & CentralAuth SSO",
     version="1.0.0",
     lifespan=lifespan
 )

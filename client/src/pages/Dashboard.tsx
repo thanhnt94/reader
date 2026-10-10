@@ -399,7 +399,7 @@ export default function Dashboard() {
                           const detail = await readerApi.getCourseDetail(c.id);
                           const firstLes = detail.chapters?.[0]?.lessons?.[0];
                           if (firstLes) {
-                            navigate(`/reader/${firstLes.id}`);
+                            navigate(`/courses/${c.slug || c.id}/${firstLes.slug || firstLes.id}`);
                           } else {
                             setManageCourseId(c.id);
                           }

@@ -58,7 +58,7 @@ async def init_db():
                 demo_course = Course(
                     title="Introduction to Interactive MDX",
                     slug="intro-to-interactive-mdx",
-                    description="Welcome to Reader! Explore interactive Markdown, KaTeX, Mermaid diagrams, and TTS Karaoke.",
+                    description="Welcome to Reader! Explore interactive Markdown, KaTeX, Mermaid diagrams, and Smart Speech Narration.",
                     order_num=1
                 )
                 db.add(demo_course)
@@ -80,7 +80,7 @@ async def init_db():
 This is a demonstration of our **interactive MDX engine**.
 
 > [!NOTE]
-> Reader supports GitHub Alerts, KaTeX math formulas, syntax highlighted code, Japanese Furigana, and synchronized Karaoke TTS.
+> Reader supports GitHub Alerts, KaTeX math formulas, syntax highlighted code, Japanese Furigana, and browser-native Speech Narration.
 
 ### 📐 KaTeX Formula Example
 Here is the famous mass-energy equivalence equation:
@@ -97,14 +97,14 @@ graph TD
     A[Markdown File .md] --> B[Batch Importer]
     B --> C[Central Database]
     C --> D[Interactive MDX Reader]
-    C --> E[Edge-TTS Karaoke Engine]
+    C --> E[Smart Speech Narration]
 ```
 
 ### 💻 Code Highlight Example
 ```python
-def read_along_karaoke(audio_time: float):
-    # Highlight active sentence in real-time
-    return f"Active timestamp: {audio_time}s"
+def read_along_narration(sentence_index: int):
+    # Live narration with browser speech engine
+    return f"Active sentence: {sentence_index}"
 ```
 
 Enjoy learning with Reader!

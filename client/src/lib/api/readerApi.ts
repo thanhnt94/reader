@@ -161,7 +161,7 @@ export const readerApi = {
   },
 
   // Lessons
-  getLessonDetail: async (lessonId: number): Promise<Lesson> => {
+  getLessonDetail: async (lessonId: number | string): Promise<Lesson> => {
     const res = await apiClient.get(`/api/v1/lessons/${lessonId}`);
     return res.data;
   },

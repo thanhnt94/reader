@@ -379,9 +379,12 @@ async def batch_upload_markdown_to_course(
 # LESSONS ENDPOINTS
 # =========================
 
-@router.get("/lessons/{lesson_id}")
-async def get_lesson_detail(lesson_id: int, db: AsyncSession = Depends(get_db), current_user: Optional[User] = Depends(get_current_user_optional)):
-    res = await db.execute(select(Lesson).where(Lesson.id == lesson_id))
+@router.get("/lessons/{lesson_id_or_slug}")
+async def get_lesson_detail(lesson_id_or_slug: str, db: AsyncSession = Depends(get_db), current_user: Optional[User] = Depends(get_current_user_optional)):
+    if lesson_id_or_slug.isdigit():
+        res = await db.execute(select(Lesson).where(Lesson.id == int(lesson_id_or_slug)))
+    else:
+        res = await db.execute(select(Lesson).where(Lesson.slug == lesson_id_or_slug))
     lesson = res.scalar_one_or_none()
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
@@ -400,13 +403,22 @@ async def get_lesson_detail(lesson_id: int, db: AsyncSession = Depends(get_db), 
 
     # Attach user reading progress
     if current_user:
-        prog_res = await db.execute(select(UserReadProgress).where(UserReadProgress.user_id == current_user.id, UserReadProgress.lesson_id == lesson_id))
+        prog_res = await db.execute(select(UserReadProgress).where(UserReadProgress.user_id == current_user.id, UserReadProgress.lesson_id == lesson.id))
         prog = prog_res.scalar_one_or_none()
         data["progress"] = prog.to_dict() if prog else None
     else:
         data["progress"] = None
 
     return data
+
+@router.get("/courses/{course_id_or_slug}/lessons/{lesson_id_or_slug}")
+async def get_course_lesson_detail(
+    course_id_or_slug: str,
+    lesson_id_or_slug: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    return await get_lesson_detail(lesson_id_or_slug=lesson_id_or_slug, db=db, current_user=current_user)
 
 @router.post("/lessons")
 async def create_lesson(data: LessonCreateRequest, db: AsyncSession = Depends(get_db), admin: User = Depends(get_current_admin)):

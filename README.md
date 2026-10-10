@@ -1,6 +1,6 @@
-# 📖 Reader LMS — Interactive MDX & Karaoke TTS Platform
+# 📖 Reader LMS — Interactive MDX & Smart Speech Narration Platform
 
-**Reader** (`read.inmind.site`) là nền tảng bài giảng số (File-driven LMS) trong Hệ sinh thái InMind Ecosystem. Ứng dụng cho phép tạo khóa học từ các file Markdown (`.md`), tích hợp trình đọc tương tác cấp độ 4 (Interactive MDX), trình phát âm thanh Karaoke đồng bộ câu chữ (Read-Along TTS), và xác thực tập trung qua **CentralAuth**.
+**Reader** (`read.inmind.site`) là nền tảng bài giảng số (File-driven LMS) trong Hệ sinh thái InMind Ecosystem. Ứng dụng cho phép tạo khóa học từ các file Markdown (`.md`), tích hợp trình đọc tương tác cấp độ 4 (Interactive MDX), trình phát âm thanh thông minh đa ngôn ngữ (Smart Browser Speech Narration), và xác thực tập trung qua **CentralAuth**.
 
 ---
 
@@ -30,7 +30,7 @@
 4. **CentralAuth Synchronized TTS Audio Player**:
    - Đồng bộ hóa tạo âm thanh bài đọc trực tiếp qua CentralAuth (`POST /api/tts/generate`), lưu trữ tập trung tại CDN CentralAuth (`https://inmind.site/static/reader/{lesson_id}/audio/...`).
    - Trình phát âm thanh tiêu chuẩn hiện đại (Modern Glassmorphic Docked Player): Play/Pause, tua ±10s, chọn tốc độ đọc (0.8x - 2.0x), thanh tua tiến trình (Seekable Scrubber), điều chỉnh âm lượng & Mute.
-   - Loại bỏ độ trễ và sự cồng kềnh của cơ chế highlight từng câu Karaoke, mang lại trải nghiệm đọc sách tự nhiên, mượt mà.
+   - Trải nghiệm đọc sách tự nhiên, mượt mà, tích hợp trình đọc giọng nói trình duyệt Web Speech API tức thời.
 5. **CentralAuth SSO Integration & Công Tắc Bật Tắt (SSO Toggle)**:
    - Hỗ trợ công tắc bật/tắt linh hoạt giữa **Đăng nhập tập trung CentralAuth** (`https://inmind.site/api/auth/jump/reader-v1`) và **Đăng nhập tài khoản nội bộ** (Local Login / Backdoor Bypass `?backdoor=1`).
    - Tích hợp Modal Cài đặt SSO với tính năng Kiểm tra kết nối tức thời (`POST /api/sso/test`).

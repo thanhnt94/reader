@@ -22,10 +22,16 @@ import confetti from 'canvas-confetti';
 import { readerApi, Lesson, Course } from '../lib/api/readerApi';
 import { MarkdownRenderer } from '../components/mdx/MarkdownRenderer';
 import { AudioPlayer } from '../components/player/AudioPlayer';
+import { BrowserSpeechPlayer } from '../components/player/BrowserSpeechPlayer';
 import { useAppStore } from '../store/useAppStore';
 
 export default function LessonReader() {
-  const { lessonId } = useParams<{ lessonId: string }>();
+  const { lessonId, lessonSlug, courseSlug, courseId } = useParams<{
+    lessonId?: string;
+    lessonSlug?: string;
+    courseSlug?: string;
+    courseId?: string;
+  }>();
   const navigate = useNavigate();
 
   const { settings, updateSettings, user } = useAppStore();
@@ -38,31 +44,44 @@ export default function LessonReader() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTOCOpen, setIsTOCOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [isSpeechPlayerOpen, setIsSpeechPlayerOpen] = useState(false);
 
   // Active Heading (Scrollspy)
   const [activeHeadingId, setActiveHeadingId] = useState<string>('');
 
+  // Target identifier: either slug or ID
+  const targetLookup = lessonSlug || lessonId;
+
   // Load lesson details
   useEffect(() => {
-    if (!lessonId) return;
+    if (!targetLookup) return;
 
     setIsLoading(true);
     readerApi
-      .getLessonDetail(Number(lessonId))
+      .getLessonDetail(targetLookup)
       .then((les) => {
         setLesson(les);
         setIsLoading(false);
 
         // Load full course tree for left sidebar
         if (les.chapter?.course_id) {
-          readerApi.getCourseDetail(les.chapter.course_id).then(setCourse).catch(console.error);
+          readerApi.getCourseDetail(les.chapter.course_id).then((c) => {
+            setCourse(c);
+            document.title = `${les.title} — ${c.title}`;
+            // Clean up browser URL if navigated via /reader/:id
+            if (window.location.pathname.startsWith('/reader/')) {
+              window.history.replaceState(null, '', `/courses/${c.slug}/${les.slug}`);
+            }
+          }).catch(console.error);
+        } else {
+          document.title = `${les.title} — Reader`;
         }
       })
       .catch((err) => {
         console.error('Failed to load lesson', err);
         setIsLoading(false);
       });
-  }, [lessonId]);
+  }, [targetLookup]);
 
   // Scrollspy: Track active heading on scroll
   useEffect(() => {
@@ -238,6 +257,21 @@ export default function LessonReader() {
             <ListTree className="w-4 h-4" />
           </button>
 
+          {/* Browser Native Speech Engine TTS */}
+          <button
+            type="button"
+            onClick={() => setIsSpeechPlayerOpen(!isSpeechPlayerOpen)}
+            title="Listen with Browser Native Speech Engine (Auto-detects Japanese/Vietnamese & cleans Furigana)"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              isSpeechPlayerOpen
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700/60'
+            }`}
+          >
+            <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Speech TTS</span>
+          </button>
+
           {/* Mark Completed Button */}
           <button
             type="button"
@@ -294,7 +328,7 @@ export default function LessonReader() {
 
                 <div className="space-y-0.5">
                   {chap.lessons?.map((les) => {
-                    const isCurrent = les.id === Number(lessonId);
+                    const isCurrent = les.id === lesson.id || les.slug === targetLookup;
                     const lesCompleted = les.progress?.is_completed;
 
                     return (
@@ -302,7 +336,7 @@ export default function LessonReader() {
                         key={les.id}
                         type="button"
                         onClick={() => {
-                          navigate(`/reader/${les.id}`);
+                          navigate(course ? `/courses/${course.slug || course.id}/${les.slug || les.id}` : `/reader/${les.id}`);
                           setIsSidebarOpen(false);
                         }}
                         className={`w-full text-left px-2.5 py-2 rounded-xl flex items-center justify-between gap-2 transition-all cursor-pointer ${isCurrent ? 'bg-emerald-500/15 text-emerald-300 font-semibold border border-emerald-500/30' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`}
@@ -374,7 +408,7 @@ export default function LessonReader() {
               {prevLesson ? (
                 <button
                   type="button"
-                  onClick={() => navigate(`/reader/${prevLesson?.id}`)}
+                  onClick={() => navigate(course ? `/courses/${course.slug || course.id}/${prevLesson?.slug || prevLesson?.id}` : `/reader/${prevLesson?.id}`)}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -389,7 +423,7 @@ export default function LessonReader() {
               {nextLesson && (
                 <button
                   type="button"
-                  onClick={() => navigate(`/reader/${nextLesson?.id}`)}
+                  onClick={() => navigate(course ? `/courses/${course.slug || course.id}/${nextLesson?.slug || nextLesson?.id}` : `/reader/${nextLesson?.id}`)}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <span className="truncate max-w-[140px] sm:max-w-[200px]">
@@ -482,6 +516,14 @@ export default function LessonReader() {
           </div>
         </>
       )}
+
+      {/* Browser Native Speech Player */}
+      <BrowserSpeechPlayer
+        rawMarkdown={lesson.raw_markdown || ''}
+        title={lesson.title}
+        isOpen={isSpeechPlayerOpen}
+        onClose={() => setIsSpeechPlayerOpen(false)}
+      />
 
       {/* Docked Audio Player */}
       {lesson.audio_url && (
