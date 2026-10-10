@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+import os
+import re
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func
 from pydantic import BaseModel
@@ -13,6 +15,9 @@ from app.modules.tts.services.tts_service import TTSService
 
 router = APIRouter(prefix="/api/v1", tags=["Courses & Lessons"])
 
+def natural_sort_key(s: str):
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
+
 class CourseCreateRequest(BaseModel):
     title: str
     description: Optional[str] = ""
@@ -20,10 +25,22 @@ class CourseCreateRequest(BaseModel):
     cover_image: Optional[str] = None
     order_num: Optional[int] = 0
 
+class CourseUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    cover_image: Optional[str] = None
+    order_num: Optional[int] = None
+    is_published: Optional[bool] = None
+
 class ChapterCreateRequest(BaseModel):
-    course_id: int
+    course_id: Optional[int] = None
     title: str
     order_num: Optional[int] = 0
+
+class ChapterUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    order_num: Optional[int] = None
 
 class LessonCreateRequest(BaseModel):
     chapter_id: int
@@ -37,6 +54,7 @@ class LessonUpdateRequest(BaseModel):
     raw_markdown: Optional[str] = None
     order_num: Optional[int] = None
     tts_enabled: Optional[bool] = None
+    chapter_id: Optional[int] = None
 
 class ProgressUpdateRequest(BaseModel):
     is_completed: Optional[bool] = None
@@ -129,15 +147,233 @@ async def get_course_detail(course_id: int, db: AsyncSession = Depends(get_db), 
     c_dict["chapters"] = chapters_data
     return c_dict
 
+@router.put("/courses/{course_id}")
+async def update_course(course_id: int, data: CourseUpdateRequest, db: AsyncSession = Depends(get_db), admin: User = Depends(get_current_admin)):
+    res = await db.execute(select(Course).where(Course.id == course_id))
+    course = res.scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if data.title is not None and data.title.strip():
+        course.title = data.title.strip()
+    if data.description is not None:
+        course.description = data.description
+    if data.icon is not None:
+        course.icon = data.icon
+    if data.cover_image is not None:
+        course.cover_image = data.cover_image
+    if data.order_num is not None:
+        course.order_num = data.order_num
+    if data.is_published is not None:
+        course.is_published = data.is_published
+
+    await db.commit()
+    await db.refresh(course)
+    return course.to_dict()
+
 @router.delete("/courses/{course_id}")
 async def delete_course(course_id: int, db: AsyncSession = Depends(get_db), admin: User = Depends(get_current_admin)):
     res = await db.execute(select(Course).where(Course.id == course_id))
     course = res.scalar_one_or_none()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+
+    chap_res = await db.execute(select(Chapter.id).where(Chapter.course_id == course_id))
+    chap_ids = chap_res.scalars().all()
+    if chap_ids:
+        les_res = await db.execute(select(Lesson.id).where(Lesson.chapter_id.in_(chap_ids)))
+        les_ids = les_res.scalars().all()
+        if les_ids:
+            await db.execute(delete(UserReadProgress).where(UserReadProgress.lesson_id.in_(les_ids)))
+            await db.execute(delete(Lesson).where(Lesson.id.in_(les_ids)))
+        await db.execute(delete(Chapter).where(Chapter.id.in_(chap_ids)))
+
     await db.delete(course)
     await db.commit()
     return {"status": "success", "message": "Course deleted"}
+
+# =========================
+# CHAPTERS ENDPOINTS
+# =========================
+
+@router.post("/courses/{course_id}/chapters")
+async def create_chapter(course_id: int, data: ChapterCreateRequest, db: AsyncSession = Depends(get_db), admin: User = Depends(get_current_admin)):
+    res = await db.execute(select(Course).where(Course.id == course_id))
+    course = res.scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    chap_title = data.title.strip()
+    if not chap_title:
+        raise HTTPException(status_code=400, detail="Chapter title cannot be empty")
+
+    slug = f"{course.slug}-{BatchImporter.slugify(chap_title)}"
+    if not data.order_num:
+        cnt_res = await db.execute(select(func.coalesce(func.max(Chapter.order_num), 0)).where(Chapter.course_id == course_id))
+        order_num = (cnt_res.scalar() or 0) + 1
+    else:
+        order_num = data.order_num
+
+    chapter = Chapter(
+        course_id=course_id,
+        title=chap_title,
+        slug=slug,
+        order_num=order_num
+    )
+    db.add(chapter)
+    await db.commit()
+    await db.refresh(chapter)
+    return chapter.to_dict()
+
+@router.put("/chapters/{chapter_id}")
+async def update_chapter(chapter_id: int, data: ChapterUpdateRequest, db: AsyncSession = Depends(get_db), admin: User = Depends(get_current_admin)):
+    res = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
+    chapter = res.scalar_one_or_none()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    if data.title is not None and data.title.strip():
+        chapter.title = data.title.strip()
+    if data.order_num is not None:
+        chapter.order_num = data.order_num
+
+    await db.commit()
+    await db.refresh(chapter)
+    return chapter.to_dict()
+
+@router.delete("/chapters/{chapter_id}")
+async def delete_chapter(chapter_id: int, db: AsyncSession = Depends(get_db), admin: User = Depends(get_current_admin)):
+    res = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
+    chapter = res.scalar_one_or_none()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    les_res = await db.execute(select(Lesson.id).where(Lesson.chapter_id == chapter_id))
+    les_ids = les_res.scalars().all()
+    if les_ids:
+        await db.execute(delete(UserReadProgress).where(UserReadProgress.lesson_id.in_(les_ids)))
+        await db.execute(delete(Lesson).where(Lesson.id.in_(les_ids)))
+
+    await db.delete(chapter)
+    await db.commit()
+    return {"status": "success", "message": "Chapter deleted"}
+
+# =========================
+# BATCH MARKDOWN UPLOAD
+# =========================
+
+@router.post("/chapters/{chapter_id}/batch-upload-md")
+async def batch_upload_markdown_to_chapter(
+    chapter_id: int,
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    chap_res = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
+    chapter = chap_res.scalar_one_or_none()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    # Filter markdown files
+    md_files = [f for f in files if (f.filename or "").lower().endswith((".md", ".markdown"))]
+    if not md_files:
+        raise HTTPException(status_code=400, detail="No .md files found in upload")
+
+    # Natural sort by filename
+    sorted_files = sorted(md_files, key=lambda f: natural_sort_key(f.filename or ""))
+
+    # Find highest order_num in chapter
+    max_order_res = await db.execute(select(func.coalesce(func.max(Lesson.order_num), 0)).where(Lesson.chapter_id == chapter_id))
+    current_max_order = max_order_res.scalar() or 0
+
+    created_lessons = []
+    for idx, f in enumerate(sorted_files, start=1):
+        filename = f.filename or f"lesson_{idx}.md"
+        base_name = os.path.splitext(filename)[0]
+
+        # Extract number prefix if present, e.g. "01. ..." -> 1
+        m = re.match(r'^\D*(\d+)', base_name)
+        if m:
+            file_order = int(m.group(1))
+        else:
+            file_order = current_max_order + idx
+
+        content_bytes = await f.read()
+        raw_text = content_bytes.decode("utf-8", errors="ignore")
+
+        meta, clean_md = BatchImporter.parse_frontmatter(raw_text)
+        fallback_title = re.sub(r'^\d+[\s._\-–:]*', '', base_name).strip() or base_name
+        lesson_title = meta.get("title") or BatchImporter.extract_title(clean_md, fallback_title)
+        toc = BatchImporter.extract_toc(clean_md)
+        slug_seed = BatchImporter.slugify(fallback_title)
+        lesson_slug = f"c{chapter.id}-o{file_order}-{slug_seed[:60]}"
+
+        lesson = Lesson(
+            chapter_id=chapter.id,
+            title=lesson_title.strip(),
+            slug=lesson_slug,
+            raw_markdown=raw_text,
+            frontmatter_data=meta,
+            toc_data=toc,
+            order_num=file_order,
+            tts_enabled=True,
+            tts_generated=False
+        )
+        db.add(lesson)
+        created_lessons.append(lesson)
+
+    await db.commit()
+    for l in created_lessons:
+        await db.refresh(l)
+
+    return {
+        "status": "success",
+        "chapter_id": chapter.id,
+        "chapter_title": chapter.title,
+        "imported_count": len(created_lessons),
+        "lessons": [l.to_dict(include_content=False) for l in created_lessons]
+    }
+
+@router.post("/courses/{course_id}/batch-upload-md")
+async def batch_upload_markdown_to_course(
+    course_id: int,
+    chapter_id: Optional[int] = Form(None),
+    new_chapter_title: Optional[str] = Form(None),
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    c_res = await db.execute(select(Course).where(Course.id == course_id))
+    course = c_res.scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    target_chapter: Optional[Chapter] = None
+    if chapter_id:
+        chap_res = await db.execute(select(Chapter).where(Chapter.id == chapter_id, Chapter.course_id == course_id))
+        target_chapter = chap_res.scalar_one_or_none()
+
+    if not target_chapter:
+        if new_chapter_title and new_chapter_title.strip():
+            title = new_chapter_title.strip()
+        else:
+            title = "Chapter 1"
+        cnt_res = await db.execute(select(func.coalesce(func.max(Chapter.order_num), 0)).where(Chapter.course_id == course_id))
+        new_order = (cnt_res.scalar() or 0) + 1
+        target_chapter = Chapter(
+            course_id=course_id,
+            title=title,
+            slug=f"{course.slug}-{BatchImporter.slugify(title)}",
+            order_num=new_order
+        )
+        db.add(target_chapter)
+        await db.commit()
+        await db.refresh(target_chapter)
+
+    return await batch_upload_markdown_to_chapter(target_chapter.id, files, db, admin)
 
 # =========================
 # LESSONS ENDPOINTS
@@ -222,6 +458,12 @@ async def update_lesson(lesson_id: int, data: LessonUpdateRequest, db: AsyncSess
 
     if data.tts_enabled is not None:
         lesson.tts_enabled = data.tts_enabled
+
+    if data.chapter_id is not None:
+        ch_check = await db.execute(select(Chapter).where(Chapter.id == data.chapter_id))
+        if not ch_check.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Target chapter not found")
+        lesson.chapter_id = data.chapter_id
 
     await db.commit()
     await db.refresh(lesson)

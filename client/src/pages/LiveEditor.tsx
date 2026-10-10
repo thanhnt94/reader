@@ -30,6 +30,7 @@ export default function LiveEditor() {
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<number | ''>('');
+  const [availableChapters, setAvailableChapters] = useState<Chapter[]>([]);
   const [selectedChapterId, setSelectedChapterId] = useState<number | ''>('');
   const [lessonTitle, setLessonTitle] = useState('');
   const [markdown, setMarkdown] = useState('');
@@ -47,6 +48,51 @@ export default function LiveEditor() {
     readerApi.getCourses().then(setCourses).catch(console.error);
   }, []);
 
+  // Fetch chapters whenever selected course changes
+  useEffect(() => {
+    if (selectedCourseId) {
+      readerApi
+        .getCourseDetail(Number(selectedCourseId))
+        .then((c) => {
+          setAvailableChapters(c.chapters || []);
+          if (c.chapters && c.chapters.length > 0 && !selectedChapterId) {
+            setSelectedChapterId(c.chapters[0].id);
+          }
+        })
+        .catch(console.error);
+    } else {
+      setAvailableChapters([]);
+    }
+  }, [selectedCourseId]);
+
+  const handleQuickCreateCourse = async () => {
+    const title = window.prompt('Enter new course title:');
+    if (!title || !title.trim()) return;
+    try {
+      const created = await readerApi.createCourse({ title: title.trim() });
+      setCourses((prev) => [...prev, created]);
+      setSelectedCourseId(created.id);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to create course');
+    }
+  };
+
+  const handleQuickCreateChapter = async () => {
+    if (!selectedCourseId) {
+      alert('Please select a course first');
+      return;
+    }
+    const title = window.prompt('Enter new chapter title (e.g. Chapter 1, Reflex Speaking):');
+    if (!title || !title.trim()) return;
+    try {
+      const created = await readerApi.createChapter(Number(selectedCourseId), { title: title.trim() });
+      setAvailableChapters((prev) => [...prev, created]);
+      setSelectedChapterId(created.id);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to create chapter');
+    }
+  };
+
   // Load lesson if lessonId present
   useEffect(() => {
     if (lessonId) {
@@ -57,8 +103,8 @@ export default function LiveEditor() {
           setMarkdown(l.raw_markdown || '');
           setOrderNum(l.order_num || 1);
           if (l.chapter) {
-            setSelectedChapterId(l.chapter.id);
             setSelectedCourseId(l.chapter.course_id);
+            setSelectedChapterId(l.chapter.id);
           }
         })
         .catch((e) => console.error('Failed to load lesson', e));
@@ -123,6 +169,7 @@ graph LR
           title: lessonTitle.trim(),
           raw_markdown: markdown,
           order_num: orderNum,
+          chapter_id: selectedChapterId ? Number(selectedChapterId) : undefined,
         });
         setStatusMsg({ type: 'success', text: 'Saved successfully!' });
       } else {
@@ -161,9 +208,6 @@ graph LR
       setStatusMsg({ type: 'error', text: 'Failed to trigger TTS' });
     }
   };
-
-  const selectedCourse = courses.find((c) => c.id === Number(selectedCourseId));
-  const availableChapters = selectedCourse?.chapters || [];
 
   return (
     <div className="h-screen flex flex-col bg-[#0b0f19] text-slate-100 overflow-hidden font-sans">
@@ -257,39 +301,56 @@ graph LR
           className="flex-1 min-w-[220px] bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-1.5 text-white font-medium placeholder-slate-500 focus:outline-none focus:border-emerald-500"
         />
 
-        {!lessonId && (
-          <>
-            <select
-              value={selectedCourseId}
-              onChange={(e) => {
-                setSelectedCourseId(Number(e.target.value) || '');
-                setSelectedChapterId('');
-              }}
-              className="bg-slate-800/60 border border-slate-700/60 rounded-xl px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-emerald-500"
-            >
-              <option value="">Select Course...</option>
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </select>
+        <div className="flex items-center gap-1.5">
+          <select
+            value={selectedCourseId}
+            onChange={(e) => {
+              setSelectedCourseId(Number(e.target.value) || '');
+              setSelectedChapterId('');
+            }}
+            className="bg-slate-800/60 border border-slate-700/60 rounded-xl px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-emerald-500 max-w-[140px] truncate"
+          >
+            <option value="">Select Course...</option>
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleQuickCreateCourse}
+            title="Create New Course"
+            className="px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700/60 text-[11px] font-bold cursor-pointer"
+          >
+            + Course
+          </button>
+        </div>
 
-            <select
-              value={selectedChapterId}
-              onChange={(e) => setSelectedChapterId(Number(e.target.value) || '')}
-              disabled={!selectedCourseId}
-              className="bg-slate-800/60 border border-slate-700/60 rounded-xl px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-emerald-500 disabled:opacity-40"
-            >
-              <option value="">Select Chapter...</option>
-              {availableChapters.map((ch) => (
-                <option key={ch.id} value={ch.id}>
-                  {ch.title}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
+        <div className="flex items-center gap-1.5">
+          <select
+            value={selectedChapterId}
+            onChange={(e) => setSelectedChapterId(Number(e.target.value) || '')}
+            disabled={!selectedCourseId}
+            className="bg-slate-800/60 border border-slate-700/60 rounded-xl px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-emerald-500 disabled:opacity-40 max-w-[150px] truncate"
+          >
+            <option value="">Select Chapter...</option>
+            {availableChapters.map((ch) => (
+              <option key={ch.id} value={ch.id}>
+                {ch.title}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleQuickCreateChapter}
+            disabled={!selectedCourseId}
+            title="Create New Chapter in Selected Course"
+            className="px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700/60 text-[11px] font-bold disabled:opacity-40 cursor-pointer"
+          >
+            + Chapter
+          </button>
+        </div>
 
         <div className="flex items-center gap-1.5 text-slate-400">
           <span>Order:</span>

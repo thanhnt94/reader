@@ -106,12 +106,57 @@ export const readerApi = {
     const res = await apiClient.get(`/api/v1/courses/${courseId}`);
     return res.data;
   },
-  createCourse: async (data: any): Promise<Course> => {
+  createCourse: async (data: { title: string; description?: string; icon?: string }): Promise<Course> => {
     const res = await apiClient.post('/api/v1/courses', data);
+    return res.data;
+  },
+  updateCourse: async (courseId: number, data: Partial<Course>): Promise<Course> => {
+    const res = await apiClient.put(`/api/v1/courses/${courseId}`, data);
     return res.data;
   },
   deleteCourse: async (courseId: number) => {
     const res = await apiClient.delete(`/api/v1/courses/${courseId}`);
+    return res.data;
+  },
+
+  // Chapters
+  createChapter: async (courseId: number, data: { title: string; order_num?: number }): Promise<Chapter> => {
+    const res = await apiClient.post(`/api/v1/courses/${courseId}/chapters`, data);
+    return res.data;
+  },
+  updateChapter: async (chapterId: number, data: { title?: string; order_num?: number }): Promise<Chapter> => {
+    const res = await apiClient.put(`/api/v1/chapters/${chapterId}`, data);
+    return res.data;
+  },
+  deleteChapter: async (chapterId: number) => {
+    const res = await apiClient.delete(`/api/v1/chapters/${chapterId}`);
+    return res.data;
+  },
+
+  // Batch Upload Markdown
+  batchUploadMarkdownToChapter: async (chapterId: number, files: File[]): Promise<any> => {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    const res = await apiClient.post(`/api/v1/chapters/${chapterId}/batch-upload-md`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  batchUploadMarkdownToCourse: async (
+    courseId: number,
+    options: { chapterId?: number; newChapterTitle?: string; files: File[] }
+  ): Promise<any> => {
+    const formData = new FormData();
+    if (options.chapterId) {
+      formData.append('chapter_id', String(options.chapterId));
+    }
+    if (options.newChapterTitle) {
+      formData.append('new_chapter_title', options.newChapterTitle);
+    }
+    options.files.forEach((f) => formData.append('files', f));
+    const res = await apiClient.post(`/api/v1/courses/${courseId}/batch-upload-md`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return res.data;
   },
 

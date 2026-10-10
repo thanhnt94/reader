@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { readerApi, Course } from '../lib/api/readerApi';
 import { useAppStore } from '../store/useAppStore';
+import { CreateCourseModal } from '../components/course/CreateCourseModal';
+import { CourseManagerModal } from '../components/course/CourseManagerModal';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -28,6 +30,10 @@ export default function Dashboard() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Course Studio & Management State
+  const [isCreateCourseModalOpen, setIsCreateCourseModalOpen] = useState(false);
+  const [manageCourseId, setManageCourseId] = useState<number | null>(null);
 
   // Import Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -121,6 +127,12 @@ export default function Dashboard() {
     fetchCourses();
   }, []);
 
+  const handleCourseCreated = (newCourse: Course) => {
+    setIsCreateCourseModalOpen(false);
+    fetchCourses();
+    setManageCourseId(newCourse.id);
+  };
+
   const handleImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsImporting(true);
@@ -196,6 +208,17 @@ export default function Dashboard() {
             <SettingsIcon className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden sm:inline">Settings</span>
           </button>
+
+          {user?.role === 'admin' && (
+            <button
+              type="button"
+              onClick={() => setIsCreateCourseModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">New Course</span>
+            </button>
+          )}
 
           {user?.role === 'admin' && (
             <button
@@ -291,13 +314,24 @@ export default function Dashboard() {
               Get started by importing markdown courses using our Batch Importer or create lessons in the WYSIWYG editor.
             </p>
             {user?.role === 'admin' && (
-              <button
-                type="button"
-                onClick={() => setIsImportModalOpen(true)}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20"
-              >
-                Batch Import Course
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateCourseModalOpen(true)}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create New Course</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700/60 cursor-pointer flex items-center gap-2"
+                >
+                  <FolderUp className="w-4 h-4 text-emerald-400" />
+                  <span>Batch Import ZIP</span>
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -318,9 +352,21 @@ export default function Dashboard() {
                       <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
                         <BookOpen className="w-5 h-5" />
                       </div>
-                      <span className="px-2.5 py-1 rounded-full bg-slate-800 text-[11px] font-semibold text-slate-300">
-                        {c.lesson_count || 0} Lessons
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2.5 py-1 rounded-full bg-slate-800 text-[11px] font-semibold text-slate-300">
+                          {c.lesson_count || 0} Lessons
+                        </span>
+                        {user?.role === 'admin' && (
+                          <button
+                            type="button"
+                            onClick={() => setManageCourseId(c.id)}
+                            title="Manage Course & Upload .md"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                          >
+                            <FolderUp className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <h3 className="font-bold text-base text-white mb-2 group-hover:text-emerald-300 transition-colors">
@@ -346,23 +392,36 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        // Open first lesson in course
-                        const detail = await readerApi.getCourseDetail(c.id);
-                        const firstLes = detail.chapters?.[0]?.lessons?.[0];
-                        if (firstLes) {
-                          navigate(`/reader/${firstLes.id}`);
-                        } else {
-                          navigate(`/editor`);
-                        }
-                      }}
-                      className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <span>Start Reading</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const detail = await readerApi.getCourseDetail(c.id);
+                          const firstLes = detail.chapters?.[0]?.lessons?.[0];
+                          if (firstLes) {
+                            navigate(`/reader/${firstLes.id}`);
+                          } else {
+                            setManageCourseId(c.id);
+                          }
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <span>Start Reading</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+
+                      {user?.role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => setManageCourseId(c.id)}
+                          title="Manage Course & Upload Markdown Files"
+                          className="px-3 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-emerald-400 border border-slate-700/60 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                        >
+                          <FolderUp className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Manage</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -601,6 +660,23 @@ export default function Dashboard() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Create Course Modal */}
+      <CreateCourseModal
+        isOpen={isCreateCourseModalOpen}
+        onClose={() => setIsCreateCourseModalOpen(false)}
+        onCreated={handleCourseCreated}
+      />
+
+      {/* Course Studio & Batch Markdown Uploader Modal */}
+      {manageCourseId && (
+        <CourseManagerModal
+          courseId={manageCourseId}
+          isOpen={Boolean(manageCourseId)}
+          onClose={() => setManageCourseId(null)}
+          onCourseUpdated={fetchCourses}
+        />
       )}
     </div>
   );
