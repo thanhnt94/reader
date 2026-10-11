@@ -19,7 +19,8 @@ import {
   AlertTriangle,
   RotateCcw,
   Check,
-  ChevronUp
+  ChevronUp,
+  Plus
 } from 'lucide-react';
 import { readerApi, Course, Chapter, Lesson } from '../lib/api/readerApi';
 import { useAppStore } from '../store/useAppStore';
@@ -181,8 +182,8 @@ export default function CourseDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] text-white flex flex-col items-center justify-center font-sans">
-        <div className="w-12 h-12 border-3 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
+      <div className="min-h-screen bg-[#070a13] text-white flex flex-col items-center justify-center font-sans">
+        <div className="w-12 h-12 border-3 border-sky-500/20 border-t-sky-500 rounded-full animate-spin mb-4" />
         <p className="text-sm font-semibold text-slate-400">Loading course dashboard...</p>
       </div>
     );
@@ -190,7 +191,7 @@ export default function CourseDashboard() {
 
   if (error || !course) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+      <div className="min-h-screen bg-[#070a13] text-white flex flex-col items-center justify-center p-6 text-center font-sans">
         <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-4 text-2xl font-bold">
           ⚠️
         </div>
@@ -200,7 +201,7 @@ export default function CourseDashboard() {
         </p>
         <Link
           to="/courses"
-          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition-all flex items-center gap-2"
+          className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg transition-all flex items-center gap-2"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Library</span>
@@ -210,7 +211,7 @@ export default function CourseDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-200 font-sans selection:bg-emerald-500/30 selection:text-white pb-24">
+    <div className="min-h-screen bg-[#070a13] text-slate-200 font-sans selection:bg-sky-500/30 selection:text-white pb-24">
       {/* Top Sticky Header */}
       <header className="sticky top-0 z-30 bg-[#0b0f19]/80 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -224,7 +225,7 @@ export default function CourseDashboard() {
           </Link>
           <div className="h-4 w-px bg-slate-800 hidden sm:block" />
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-bold tracking-wide uppercase">
+            <span className="px-2.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[11px] font-bold tracking-wide uppercase">
               Course
             </span>
             <h1 className="text-sm font-bold text-white truncate max-w-[200px] sm:max-w-md">
@@ -233,23 +234,35 @@ export default function CourseDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           {user?.role === 'admin' && (
-            <button
-              type="button"
-              onClick={() => setIsManagerModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold border border-slate-700/60 transition-all flex items-center gap-2 cursor-pointer shadow-sm"
-              title="Upload & Manage Markdown Files"
-            >
-              <FolderUp className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Course Studio</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => navigate('/editor')}
+                className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Create a new lesson"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">New Lesson</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsManagerModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold border border-slate-700/60 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="Batch Import & Manage Markdown Files"
+              >
+                <FolderUp className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Batch Import</span>
+              </button>
+            </>
           )}
 
           {nextLesson && (
             <Link
               to={`/courses/${course.slug || course.id}/${nextLesson.slug || nextLesson.id}`}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/25 flex items-center gap-2"
+              className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-lg shadow-sky-600/25 flex items-center gap-2"
             >
               <PlayCircle className="w-4 h-4" />
               <span>{completedLessons === 0 ? 'Start Learning' : 'Continue'}</span>
@@ -261,22 +274,22 @@ export default function CourseDashboard() {
       {/* Main Content Container */}
       <main className="max-w-6xl mx-auto px-4 sm:px-8 pt-8 space-y-8">
         {/* Hero Course Overview Card */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-emerald-950/20 border border-slate-800/80 p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-sky-950/20 border border-slate-800/80 p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3 max-w-2xl">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xl font-bold shadow-lg shadow-emerald-500/10">
+                <div className="w-12 h-12 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-xl font-bold shadow-lg shadow-sky-500/10">
                   {course.icon?.startsWith('fa') ? <BookOpen className="w-6 h-6" /> : (course.icon || '⛩️')}
                 </div>
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                     {course.title}
                   </h2>
-                  <p className="text-xs font-medium text-emerald-400/90 flex items-center gap-2 mt-0.5">
+                  <p className="text-xs font-medium text-sky-400/90 flex items-center gap-2 mt-0.5">
                     <span>Slug:</span>
-                    <code className="bg-slate-800/90 px-1.5 py-0.5 rounded text-[11px] text-emerald-300">
+                    <code className="bg-slate-800/90 px-1.5 py-0.5 rounded text-[11px] text-sky-300">
                       /courses/{course.slug}
                     </code>
                   </p>
@@ -291,15 +304,15 @@ export default function CourseDashboard() {
               {/* Metric Badges */}
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs font-semibold text-slate-300">
-                  <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                  <Layers className="w-3.5 h-3.5 text-sky-400" />
                   <span>{course.chapters?.length || 0} Chapters</span>
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs font-semibold text-slate-300">
-                  <FileText className="w-3.5 h-3.5 text-teal-400" />
+                  <FileText className="w-3.5 h-3.5 text-cyan-400" />
                   <span>{totalLessons} Lessons</span>
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs font-semibold text-slate-300">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
                   <span>{completedLessons} / {totalLessons} Completed</span>
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs font-semibold text-slate-300">
@@ -314,14 +327,14 @@ export default function CourseDashboard() {
               <div>
                 <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-2">
                   <span className="flex items-center gap-1.5">
-                    <BarChart2 className="w-4 h-4 text-emerald-400" />
+                    <BarChart2 className="w-4 h-4 text-sky-400" />
                     Overall Progress
                   </span>
-                  <span className="text-emerald-400 font-mono">{progressPct}%</span>
+                  <span className="text-sky-400 font-mono">{progressPct}%</span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5">
                   <div
-                    className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 rounded-full transition-all duration-700 shadow-sm"
+                    className="h-full bg-gradient-to-r from-sky-500 via-blue-500 to-cyan-400 rounded-full transition-all duration-700 shadow-sm"
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
@@ -334,16 +347,16 @@ export default function CourseDashboard() {
                   </div>
                   <Link
                     to={`/courses/${course.slug || course.id}/${nextLesson.slug || nextLesson.id}`}
-                    className="group block p-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-850 transition-all"
+                    className="group block p-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/50 hover:bg-slate-850 transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <div className="truncate pr-2">
-                        <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors truncate">
+                        <div className="text-xs font-bold text-white group-hover:text-sky-300 transition-colors truncate">
                           {nextLesson.title}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">Click to continue reading</div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-sky-400 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
                     </div>
                   </Link>
                 </div>
@@ -354,21 +367,21 @@ export default function CourseDashboard() {
 
         {/* Full Syllabus Complete Banner */}
         {missingAnalysis && missingAnalysis.missingList.length === 0 && (
-          <section className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-4 backdrop-blur-md flex items-center justify-between gap-3">
+          <section className="rounded-2xl bg-sky-500/10 border border-sky-500/30 p-4 backdrop-blur-md flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+              <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold">
                 <Check className="w-4 h-4 stroke-[3]" />
               </div>
               <div>
-                <h3 className="text-xs sm:text-sm font-bold text-emerald-300">
+                <h3 className="text-xs sm:text-sm font-bold text-sky-300">
                   Full Syllabus Active (87 / 87 Questions)
                 </h3>
-                <p className="text-[11px] text-emerald-400/80">
+                <p className="text-[11px] text-sky-400/80">
                   All 87 Japanese Speaking Skill Test questions are synchronized and ready to study.
                 </p>
               </div>
             </div>
-            <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold font-mono">
+            <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold font-mono">
               100% Complete
             </span>
           </section>
@@ -424,7 +437,7 @@ export default function CourseDashboard() {
               placeholder="Search lesson by title or question number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-emerald-500 focus:outline-none text-xs text-white placeholder-slate-500 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-sky-500 focus:outline-none text-xs text-white placeholder-slate-500 transition-all"
             />
             {searchQuery && (
               <button
@@ -445,7 +458,7 @@ export default function CourseDashboard() {
                 onClick={() => setFilterStatus('all')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
                   filterStatus === 'all'
-                    ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                    ? 'bg-sky-600 text-white shadow-sm font-bold'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -456,7 +469,7 @@ export default function CourseDashboard() {
                 onClick={() => setFilterStatus('unread')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
                   filterStatus === 'unread'
-                    ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                    ? 'bg-sky-600 text-white shadow-sm font-bold'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -467,7 +480,7 @@ export default function CourseDashboard() {
                 onClick={() => setFilterStatus('completed')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
                   filterStatus === 'completed'
-                    ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                    ? 'bg-sky-600 text-white shadow-sm font-bold'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -553,7 +566,7 @@ export default function CourseDashboard() {
                       <div className="hidden sm:flex items-center gap-2">
                         <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                            className="h-full bg-sky-500 rounded-full transition-all duration-500"
                             style={{ width: `${chapProgress}%` }}
                           />
                         </div>
@@ -585,11 +598,11 @@ export default function CourseDashboard() {
                               {/* Status Check / Icon */}
                               <div className="flex-shrink-0">
                                 {isDone ? (
-                                  <div className="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                                  <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
                                     <Check className="w-3.5 h-3.5 stroke-[3]" />
                                   </div>
                                 ) : (
-                                  <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:border-emerald-500/50 group-hover:text-emerald-400 transition-colors">
+                                  <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:border-sky-500/50 group-hover:text-sky-400 transition-colors">
                                     <FileText className="w-3.5 h-3.5" />
                                   </div>
                                 )}
@@ -597,7 +610,7 @@ export default function CourseDashboard() {
 
                               {/* Title & Metadata */}
                               <div className="min-w-0">
-                                <h4 className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-emerald-300 transition-colors truncate">
+                                <h4 className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-sky-300 transition-colors truncate">
                                   {lesson.title}
                                 </h4>
                                 <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
@@ -612,7 +625,7 @@ export default function CourseDashboard() {
                             <div className="flex items-center gap-2.5 flex-shrink-0">
                               {hasAudio && (
                                 <span
-                                  className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800/80 text-[10px] font-semibold text-emerald-400 border border-slate-700/60"
+                                  className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800/80 text-[10px] font-semibold text-sky-400 border border-slate-700/60"
                                   title="Browser Speech Audio Available"
                                 >
                                   <Volume2 className="w-3 h-3" />
@@ -621,7 +634,7 @@ export default function CourseDashboard() {
                               )}
 
                               {isDone ? (
-                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
+                                <span className="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[10px] font-bold">
                                   Done
                                 </span>
                               ) : (
@@ -630,7 +643,7 @@ export default function CourseDashboard() {
                                 </span>
                               )}
 
-                              <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+                              <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-sky-400 group-hover:translate-x-0.5 transition-all" />
                             </div>
                           </Link>
                         );

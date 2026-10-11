@@ -149,9 +149,9 @@ export default function Login() {
 
   if (!authConfig) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] text-white flex items-center justify-center font-sans">
+      <div className="min-h-screen bg-[#070a13] text-white flex items-center justify-center font-sans">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 rounded-full border-3 border-emerald-500/30 border-t-emerald-500 animate-spin" />
+          <div className="w-10 h-10 rounded-full border-3 border-sky-500/30 border-t-sky-500 animate-spin" />
           <span className="text-slate-400 text-xs font-medium">Connecting to CentralAuth...</span>
         </div>
       </div>
@@ -161,10 +161,10 @@ export default function Login() {
   const showSSO = authConfig.sso_enabled && !isBackdoor;
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-white flex items-center justify-center font-sans p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-[#070a13] text-white flex items-center justify-center font-sans p-6 relative overflow-hidden">
       {/* Glow Orbs */}
-      <div className="absolute top-[-20%] left-[-20%] w-[55vw] h-[55vw] rounded-full bg-emerald-600 opacity-10 blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-20%] w-[55vw] h-[55vw] rounded-full bg-teal-500 opacity-10 blur-[130px] pointer-events-none" />
+      <div className="absolute top-[-20%] left-[-20%] w-[55vw] h-[55vw] rounded-full bg-sky-600 opacity-10 blur-[130px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-20%] w-[55vw] h-[55vw] rounded-full bg-cyan-500 opacity-10 blur-[130px] pointer-events-none" />
 
       {/* Top Right Quick Settings Toggle */}
       <button
@@ -173,14 +173,14 @@ export default function Login() {
         className="absolute top-6 right-6 p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all cursor-pointer z-20 flex items-center gap-2 text-xs font-semibold"
         title="SSO Configuration"
       >
-        <SettingsIcon className="w-4 h-4 text-emerald-400" />
+        <SettingsIcon className="w-4 h-4 text-sky-400" />
         <span className="hidden sm:inline">SSO Settings</span>
       </button>
 
       <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl relative z-10">
         {/* Brand Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-slate-950 font-bold shadow-xl shadow-emerald-600/25 mb-4">
+          <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-sky-600 to-cyan-500 flex items-center justify-center text-slate-950 font-bold shadow-xl shadow-sky-600/25 mb-4">
             <BookOpen className="w-7 h-7 fill-current" />
           </div>
           <h2 className="text-xl font-bold text-white tracking-tight">Reader LMS</h2>
@@ -202,8 +202,8 @@ export default function Login() {
           <div className="flex flex-col gap-5">
             {!urlError ? (
               <div className="flex flex-col items-center gap-3 py-6">
-                <div className="w-9 h-9 rounded-full border-3 border-emerald-500/30 border-t-emerald-500 animate-spin" />
-                <span className="text-emerald-400 font-semibold text-xs animate-pulse">
+                <div className="w-9 h-9 rounded-full border-3 border-sky-500/30 border-t-sky-500 animate-spin" />
+                <span className="text-sky-400 font-semibold text-xs animate-pulse">
                   Redirecting to Central SSO...
                 </span>
                 <button
@@ -217,7 +217,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setSearchParams({ backdoor: '1' })}
-                    className="text-xs text-slate-400 hover:text-emerald-400 font-medium underline transition-colors cursor-pointer"
+                    className="text-xs text-slate-400 hover:text-sky-400 font-medium underline transition-colors cursor-pointer"
                   >
                     Administrator Local Backdoor Bypass
                   </button>
@@ -228,7 +228,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={handleSSORedirect}
-                  className="w-full py-3.5 px-6 rounded-2xl font-bold text-xs bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-600/25 transition-all duration-300 flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+                  className="w-full py-3.5 px-6 rounded-2xl font-bold text-xs bg-gradient-to-r from-sky-600 to-cyan-500 hover:from-sky-500 hover:to-cyan-400 text-slate-950 shadow-lg shadow-sky-600/25 transition-all duration-300 flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
                 >
                   <span>Sign In with Central SSO</span>
                   <ArrowRight className="w-4 h-4" />
@@ -238,7 +238,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setSearchParams({ backdoor: '1' })}
-                    className="text-xs text-slate-400 hover:text-emerald-400 font-medium underline transition-colors cursor-pointer"
+                    className="text-xs text-slate-400 hover:text-sky-400 font-medium underline transition-colors cursor-pointer"
                   >
                     Administrator Local Backdoor Bypass
                   </button>
@@ -256,7 +256,7 @@ export default function Login() {
               </div>
             ) : (
               <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 font-medium flex items-start gap-2">
-                <Globe className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <Globe className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                 <span>SSO Routing is currently disabled. Using local database accounts.</span>
               </div>
             )}
@@ -270,7 +270,7 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="admin"
-                className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-xs"
+                className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 text-xs"
                 required
               />
             </div>
@@ -284,7 +284,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-xs"
+                className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 text-xs"
                 required
               />
             </div>
@@ -302,7 +302,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setSearchParams({})}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold underline transition-colors cursor-pointer"
+                  className="text-xs text-sky-400 hover:text-sky-300 font-semibold underline transition-colors cursor-pointer"
                 >
                   Sign In using Central SSO instead
                 </button>
@@ -318,7 +318,7 @@ export default function Login() {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400">
                   <Globe className="w-5 h-5" />
                 </div>
                 <div>
@@ -351,7 +351,7 @@ export default function Login() {
                   type="checkbox"
                   checked={ssoEnabled}
                   onChange={(e) => setSsoEnabled(e.target.checked)}
-                  className="w-5 h-5 text-emerald-500 bg-slate-800 border-slate-700 rounded focus:ring-emerald-500 cursor-pointer"
+                  className="w-5 h-5 text-sky-500 bg-slate-800 border-slate-700 rounded focus:ring-sky-500 cursor-pointer"
                 />
               </div>
 
@@ -364,7 +364,7 @@ export default function Login() {
                   value={ssoUrl}
                   onChange={(e) => setSsoUrl(e.target.value)}
                   placeholder="https://inmind.site"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
                   required
                 />
               </div>
@@ -379,7 +379,7 @@ export default function Login() {
                     value={ssoClientId}
                     onChange={(e) => setSsoClientId(e.target.value)}
                     placeholder="reader-v1"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
                     required
                   />
                 </div>
@@ -392,7 +392,7 @@ export default function Login() {
                     value={ssoClientSecret}
                     onChange={(e) => setSsoClientSecret(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
                     required
                   />
                 </div>
@@ -403,7 +403,7 @@ export default function Login() {
                 <div
                   className={`p-3 rounded-xl text-xs font-medium ${
                     ssoTestStatus.status === 'success'
-                      ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300'
+                      ? 'bg-sky-500/10 border border-sky-500/20 text-sky-300'
                       : ssoTestStatus.status === 'error'
                       ? 'bg-rose-500/10 border border-rose-500/20 text-rose-300'
                       : 'bg-slate-800 text-slate-300'
@@ -427,7 +427,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={isSavingSettings}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/20 transition-all cursor-pointer"
                 >
                   {isSavingSettings ? 'Saving...' : 'Save Changes'}
                 </button>

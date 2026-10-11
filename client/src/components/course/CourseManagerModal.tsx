@@ -362,7 +362,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
         {/* Top Header */}
         <div className="p-4 sm:p-6 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
@@ -370,7 +370,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                 <h3 className="font-bold text-base sm:text-lg text-white tracking-tight">
                   {course?.title || 'Course Manager'}
                 </h3>
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-[11px] font-semibold text-emerald-400 border border-slate-700/60">
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-[11px] font-semibold text-sky-400 border border-slate-700/60">
                   {chapters.length} Chapters • {totalLessons} Lessons
                 </span>
               </div>
@@ -419,7 +419,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                   type="text"
                   value={editCourseTitle}
                   onChange={(e) => setEditCourseTitle(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
                 />
               </div>
               <div>
@@ -430,7 +430,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                   type="text"
                   value={editCourseDesc}
                   onChange={(e) => setEditCourseDesc(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
                 />
               </div>
             </div>
@@ -446,7 +446,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                 type="button"
                 onClick={handleSaveCourseInfo}
                 disabled={isSavingCourse}
-                className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-xs"
+                className="px-4 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-xs font-bold text-white shadow-xs"
               >
                 {isSavingCourse ? 'Saving...' : 'Save Changes'}
               </button>
@@ -459,13 +459,13 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
           <div
             className={`mx-4 sm:mx-6 mt-4 p-3 rounded-2xl text-xs font-semibold flex items-center justify-between shrink-0 ${
               alertMsg.type === 'success'
-                ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                ? 'bg-sky-500/10 text-sky-300 border border-sky-500/20'
                 : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
             }`}
           >
             <div className="flex items-center gap-2">
               {alertMsg.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-sky-400" />
               ) : (
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               )}
@@ -489,7 +489,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
               onClick={() => setActiveTab('upload')}
               className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 activeTab === 'upload'
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                  ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -501,7 +501,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
               onClick={() => setActiveTab('explorer')}
               className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 activeTab === 'explorer'
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                  ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -515,7 +515,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-slate-400 gap-3">
-              <div className="w-8 h-8 rounded-full border-3 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+              <div className="w-8 h-8 rounded-full border-3 border-sky-500/20 border-t-sky-500 animate-spin" />
               <span className="text-xs">Loading course structure...</span>
             </div>
           ) : activeTab === 'upload' ? (
@@ -524,7 +524,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
               {/* Target Chapter Selection */}
               <div className="p-4 sm:p-5 rounded-2xl bg-slate-800/50 border border-slate-700/60">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
-                  <Folder className="w-4 h-4 text-emerald-400" />
+                  <Folder className="w-4 h-4 text-sky-400" />
                   Target Chapter (Folder) Destination
                 </label>
 
@@ -536,7 +536,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                         name="chapOption"
                         checked={targetChapterOption === 'existing'}
                         onChange={() => setTargetChapterOption('existing')}
-                        className="accent-emerald-500"
+                        className="accent-sky-500"
                       />
                       <span>Select Existing Chapter</span>
                     </label>
@@ -547,9 +547,9 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                       name="chapOption"
                       checked={targetChapterOption === 'new'}
                       onChange={() => setTargetChapterOption('new')}
-                      className="accent-emerald-500"
+                      className="accent-sky-500"
                     />
-                    <span>Create New Chapter</span>
+                      <span>Create New Chapter</span>
                   </label>
                 </div>
 
@@ -558,7 +558,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                     <select
                       value={selectedChapterId}
                       onChange={(e) => setSelectedChapterId(Number(e.target.value))}
-                      className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500"
                     >
                       {chapters.map((ch) => (
                         <option key={ch.id} value={ch.id}>
@@ -572,7 +572,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                       value={uploadNewChapterTitle}
                       onChange={(e) => setUploadNewChapterTitle(e.target.value)}
                       placeholder="e.g. Chapter 1: Reflex Speaking, Part 2..."
-                      className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
                     />
                   )}
                 </div>
@@ -599,11 +599,11 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   className={`border-2 border-dashed rounded-3xl p-8 sm:p-10 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group ${
                     isDragOver
-                      ? 'border-emerald-500 bg-emerald-500/10 scale-[1.01]'
-                      : 'border-slate-700/80 hover:border-emerald-500/50 bg-slate-800/30 hover:bg-slate-800/60'
+                      ? 'border-sky-500 bg-sky-500/10 scale-[1.01]'
+                      : 'border-slate-700/80 hover:border-sky-500/50 bg-slate-800/30 hover:bg-slate-800/60'
                   }`}
                 >
-                  <div className="w-14 h-14 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/10">
+                  <div className="w-14 h-14 rounded-3xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 group-hover:scale-110 transition-transform shadow-lg shadow-sky-500/10">
                     <Upload className="w-7 h-7" />
                   </div>
                   <div>
@@ -611,7 +611,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                       Drag & Drop markdown (.md) files here
                     </h4>
                     <p className="text-xs text-slate-400 max-w-md">
-                      Or <span className="text-emerald-400 font-semibold underline underline-offset-2">browse files</span> from your computer. You can select all 50-100 files at once!
+                      Or <span className="text-sky-400 font-semibold underline underline-offset-2">browse files</span> from your computer. You can select all 50-100 files at once!
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-slate-500">
@@ -628,7 +628,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                       <span className="font-bold text-xs uppercase text-slate-300">
                         Staged Files Ready to Import
                       </span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/30">
+                      <span className="px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-bold border border-sky-500/30">
                         {stagedFiles.length} files
                       </span>
                     </div>
@@ -651,7 +651,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                           <span className="px-1.5 py-0.5 rounded-md bg-slate-800 text-[10px] font-bold text-slate-400 shrink-0">
                             #{item.detectedOrder || idx + 1}
                           </span>
-                          <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <FileText className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                           <span className="text-white font-medium truncate">{item.name}</span>
                           <span className="text-[10px] text-slate-500 shrink-0">
                             ({(item.size / 1024).toFixed(1)} KB)
@@ -675,7 +675,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                       type="button"
                       onClick={handleBatchUploadSubmit}
                       disabled={isUploading}
-                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-xl shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs sm:text-sm shadow-xl shadow-sky-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                     >
                       {isUploading ? (
                         <>
@@ -706,19 +706,19 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                 onSubmit={handleCreateChapter}
                 className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex items-center gap-3"
               >
-                <FolderPlus className="w-5 h-5 text-emerald-400 shrink-0" />
+                <FolderPlus className="w-5 h-5 text-sky-400 shrink-0" />
                 <input
                   type="text"
                   required
                   value={newChapterTitle}
                   onChange={(e) => setNewChapterTitle(e.target.value)}
                   placeholder="New Chapter Title (e.g. Part 1: Reflex Speaking)..."
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
                 />
                 <button
                   type="submit"
                   disabled={isCreatingChapter}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0 transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shrink-0 transition-colors cursor-pointer"
                 >
                   {isCreatingChapter ? 'Adding...' : 'Add Chapter'}
                 </button>
@@ -759,7 +759,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                                 <ChevronRight className="w-4 h-4" />
                               )}
                             </button>
-                            <Folder className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <Folder className="w-4 h-4 text-sky-400 shrink-0" />
 
                             {isEditing ? (
                               <div className="flex items-center gap-2 flex-1 max-w-sm">
@@ -772,7 +772,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleSaveRenameChapter(chapter.id)}
-                                  className="p-1 rounded bg-emerald-600 text-white"
+                                  className="p-1 rounded bg-sky-600 text-white"
                                 >
                                   <Check className="w-3.5 h-3.5" />
                                 </button>
@@ -787,7 +787,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                             ) : (
                               <span
                                 onClick={() => toggleChapterExpanded(chapter.id)}
-                                className="font-bold text-xs text-white truncate cursor-pointer hover:text-emerald-300 transition-colors"
+                                className="font-bold text-xs text-white truncate cursor-pointer hover:text-sky-300 transition-colors"
                               >
                                 {chapter.title}
                               </span>
@@ -806,7 +806,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                                 setTargetChapterOption('existing');
                                 setActiveTab('upload');
                               }}
-                              className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold transition-colors flex items-center gap-1"
+                              className="px-2 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 text-[11px] font-semibold transition-colors flex items-center gap-1"
                               title="Upload .md files to this chapter"
                             >
                               <Upload className="w-3 h-3" />
@@ -853,7 +853,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                                     <span className="w-6 text-center text-[11px] font-semibold text-slate-500 shrink-0">
                                       #{lesson.order_num}
                                     </span>
-                                    <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0 group-hover:text-emerald-400 transition-colors" />
+                                    <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0 group-hover:text-sky-400 transition-colors" />
                                     <span className="text-slate-200 font-medium truncate">
                                       {lesson.title}
                                     </span>
@@ -863,7 +863,7 @@ export const CourseManagerModal: React.FC<CourseManagerModalProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => navigate(course ? `/courses/${course.slug || course.id}/${lesson.slug || lesson.id}` : `/reader/${lesson.id}`)}
-                                      className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                                      className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-sky-600 hover:text-white text-slate-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
                                     >
                                       <span>Read</span>
                                       <ExternalLink className="w-3 h-3" />

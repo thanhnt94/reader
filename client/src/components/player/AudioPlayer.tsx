@@ -129,7 +129,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
               step={0.1}
               value={currentTime}
               onChange={handleSeek}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-400 transition-all"
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 transition-all"
             />
           </div>
           <span className="text-[11px] font-mono text-slate-500 w-10 text-left shrink-0">
@@ -141,7 +141,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <div className="flex items-center justify-between gap-3">
           {/* Track Info */}
           <div className="flex items-center gap-2.5 min-w-0 max-w-[200px] sm:max-w-xs">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
               <Headphones className="w-4 h-4" />
             </div>
             <div className="min-w-0">
@@ -166,7 +166,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             <button
               type="button"
               onClick={togglePlay}
-              className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/25 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold"
+              className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-600 to-cyan-500 text-slate-950 flex items-center justify-center shadow-lg shadow-sky-500/25 hover:scale-105 active:scale-95 transition-all cursor-pointer font-bold"
             >
               {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
             </button>
@@ -186,7 +186,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             <button
               type="button"
               onClick={cycleRate}
-              className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-[11px] font-mono font-bold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-[11px] font-mono font-bold text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
               title="Playback Speed"
             >
               {playbackRate}x
@@ -208,7 +208,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 step={0.05}
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
-                className="w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                className="w-16 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
               />
             </div>
           </div>

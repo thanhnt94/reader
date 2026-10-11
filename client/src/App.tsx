@@ -43,7 +43,7 @@ class ErrorBoundary extends React.Component<
               this.setState({ hasError: false, error: null });
               window.location.href = '/';
             }}
-            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition-all"
+            className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg transition-all"
           >
             Reload Reader
           </button>

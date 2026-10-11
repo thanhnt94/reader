@@ -3,8 +3,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-primary: #10b981;
-  --color-primary-dark: #059669;
+  --color-primary: #0284c7;
+  --color-primary-dark: #0369a1;
   --color-secondary: #06b6d4;
   --font-sans: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "Fira Code", monospace;
@@ -15,6 +15,7 @@ html, body, #root {
   padding: 0;
   height: 100%;
   overflow-x: clip;
+  background-color: #070a13;
 }
 
 /* Custom Scrollbars */
@@ -26,11 +27,11 @@ html, body, #root {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(56, 189, 248, 0.2);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(56, 189, 248, 0.4);
 }
 
 
@@ -41,7 +42,7 @@ ruby {
 }
 rt {
   font-size: 0.65em;
-  color: #34d399;
+  color: #38bdf8;
   user-select: none;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -53,8 +54,8 @@ rt {
   background: rgba(56, 189, 248, 0.08);
 }
 .alert-tip {
-  border-left: 4px solid #34d399;
-  background: rgba(52, 211, 153, 0.08);
+  border-left: 4px solid #0ea5e9;
+  background: rgba(14, 165, 233, 0.08);
 }
 .alert-warning {
   border-left: 4px solid #fbbf24;
@@ -89,7 +90,7 @@ rt {
 .visual-editor h3 {
   font-size: 1.15rem;
   font-weight: 600;
-  color: #6ee7b7;
+  color: #38bdf8;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
   line-height: 1.35;
@@ -100,7 +101,7 @@ rt {
   color: #cbd5e1;
 }
 .visual-editor blockquote {
-  border-left: 3px solid #10b981;
+  border-left: 3px solid #0284c7;
   padding-left: 1rem;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
@@ -131,7 +132,7 @@ rt {
   padding: 1rem;
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  color: #6ee7b7;
+  color: #38bdf8;
   overflow-x: auto;
   margin: 1rem 0;
 }
@@ -141,7 +142,7 @@ rt {
   padding: 0.15rem 0.35rem;
   border-radius: 0.25rem;
   font-size: 0.85em;
-  color: #6ee7b7;
+  color: #38bdf8;
 }
 .visual-editor table {
   width: 100%;

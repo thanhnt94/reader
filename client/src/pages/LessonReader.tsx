@@ -16,13 +16,19 @@ import {
   Type,
   AlignLeft,
   Sparkles,
-  BookOpen
+  BookOpen,
+  MessageSquare,
+  FileText,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { readerApi, Lesson, Course } from '../lib/api/readerApi';
+import { readerApi, Lesson, Course, Chapter } from '../lib/api/readerApi';
 import { MarkdownRenderer } from '../components/mdx/MarkdownRenderer';
 import { AudioPlayer } from '../components/player/AudioPlayer';
 import { BrowserSpeechPlayer } from '../components/player/BrowserSpeechPlayer';
+import { LessonNotesDrawer } from '../components/lesson/LessonNotesDrawer';
+import { LessonCommentsSection } from '../components/lesson/LessonCommentsSection';
 import { useAppStore } from '../store/useAppStore';
 
 export default function LessonReader() {
@@ -45,6 +51,8 @@ export default function LessonReader() {
   const [isTOCOpen, setIsTOCOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [isSpeechPlayerOpen, setIsSpeechPlayerOpen] = useState(false);
+  const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
+  const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState(false);
 
   // Active Heading (Scrollspy)
   const [activeHeadingId, setActiveHeadingId] = useState<string>('');
@@ -130,9 +138,11 @@ export default function LessonReader() {
     }
   };
 
-  // Find Next / Prev lesson
+  // Find Next / Prev lesson & chapter
   let prevLesson: Lesson | null = null;
   let nextLesson: Lesson | null = null;
+  let prevChapter: Chapter | null = null;
+  let nextChapter: Chapter | null = null;
 
   if (course?.chapters) {
     const allLessons: Lesson[] = [];
@@ -140,18 +150,40 @@ export default function LessonReader() {
       if (ch.lessons) allLessons.push(...ch.lessons);
     });
 
-    const currentIndex = allLessons.findIndex((l) => l.id === Number(lessonId));
+    const currentIndex = allLessons.findIndex(
+      (l) => l.id === lesson?.id || (lesson?.slug && l.slug === lesson.slug)
+    );
     if (currentIndex > 0) prevLesson = allLessons[currentIndex - 1];
     if (currentIndex >= 0 && currentIndex < allLessons.length - 1) {
       nextLesson = allLessons[currentIndex + 1];
     }
+
+    const currentChapIdx = course.chapters.findIndex((c) => c.id === lesson?.chapter_id);
+    if (currentChapIdx > 0) prevChapter = course.chapters[currentChapIdx - 1];
+    if (currentChapIdx >= 0 && currentChapIdx < course.chapters.length - 1) {
+      nextChapter = course.chapters[currentChapIdx + 1];
+    }
   }
+
+  const navigateToLesson = (target: Lesson) => {
+    if (course) {
+      navigate(`/courses/${course.slug || course.id}/${target.slug || target.id}`);
+    } else {
+      navigate(`/reader/${target.id}`);
+    }
+  };
+
+  const navigateToChapter = (chap: Chapter) => {
+    if (chap.lessons && chap.lessons.length > 0) {
+      navigateToLesson(chap.lessons[0]);
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-slate-400">
+      <div className="min-h-screen bg-[#070a13] flex items-center justify-center text-slate-400">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-3 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+          <div className="w-10 h-10 rounded-full border-3 border-sky-500/20 border-t-sky-500 animate-spin" />
           <span className="text-sm font-medium">Loading Lesson Content...</span>
         </div>
       </div>
@@ -160,7 +192,7 @@ export default function LessonReader() {
 
   if (!lesson) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-slate-400">
+      <div className="min-h-screen bg-[#070a13] flex items-center justify-center text-slate-400">
         <div className="text-center space-y-3">
           <p className="text-lg text-white font-bold">Lesson Not Found</p>
           <button
@@ -178,7 +210,7 @@ export default function LessonReader() {
   const isCompleted = lesson.progress?.is_completed;
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#070a13] text-slate-100 flex flex-col font-sans">
       {/* Top Navbar */}
       <header className="sticky top-0 z-30 h-14 bg-slate-900/90 border-b border-slate-800 backdrop-blur-xl px-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -195,7 +227,7 @@ export default function LessonReader() {
           <div className="min-w-0 flex items-center gap-2 text-xs truncate">
             <span
               onClick={() => navigate('/')}
-              className="text-emerald-400 font-bold hover:underline cursor-pointer shrink-0"
+              className="text-sky-400 font-bold hover:underline cursor-pointer shrink-0"
             >
               Reader
             </span>
@@ -204,7 +236,7 @@ export default function LessonReader() {
                 <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                 <span
                   onClick={() => navigate(`/courses/${course.slug || course.id}`)}
-                  className="text-slate-400 hover:text-emerald-400 cursor-pointer truncate hidden sm:inline"
+                  className="text-slate-400 hover:text-sky-400 cursor-pointer truncate hidden sm:inline"
                   title="View Course Dashboard"
                 >
                   {course.title}
@@ -226,9 +258,39 @@ export default function LessonReader() {
               title="Edit in WYSIWYG Editor"
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             >
-              <Edit3 className="w-4 h-4 text-emerald-400" />
+              <Edit3 className="w-4 h-4 text-sky-400" />
             </button>
           )}
+
+          {/* Sổ tay cá nhân (Personal Notes) */}
+          <button
+            type="button"
+            onClick={() => setIsNotesDrawerOpen(true)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              isNotesDrawerOpen
+                ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-xs'
+                : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 border-slate-700/60'
+            }`}
+            title="Mở Sổ tay ghi chú cá nhân"
+          >
+            <FileText className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden sm:inline">Ghi chú</span>
+          </button>
+
+          {/* Thảo luận & Bình luận (Comments) */}
+          <button
+            type="button"
+            onClick={() => setIsCommentsDrawerOpen(true)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              isCommentsDrawerOpen
+                ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-xs'
+                : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 border-slate-700/60'
+            }`}
+            title="Thảo luận & Hỏi đáp về bài học"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Bình luận</span>
+          </button>
 
           {/* Font Size & Spacing Controls */}
           <div className="hidden md:flex items-center rounded-xl bg-slate-800/80 p-0.5 text-xs text-slate-400">
@@ -237,7 +299,7 @@ export default function LessonReader() {
                 key={sz}
                 type="button"
                 onClick={() => updateSettings({ font_size: sz })}
-                className={`px-2 py-1 rounded-lg uppercase text-[10px] font-bold transition-colors ${settings.font_size === sz ? 'bg-slate-700 text-emerald-400 shadow-xs' : 'hover:text-white'}`}
+                className={`px-2 py-1 rounded-lg uppercase text-[10px] font-bold transition-colors ${settings.font_size === sz ? 'bg-slate-700 text-sky-400 shadow-xs' : 'hover:text-white'}`}
               >
                 {sz}
               </button>
@@ -251,7 +313,7 @@ export default function LessonReader() {
             title={focusMode ? 'Exit Focus Mode' : 'Enter Focus Mode'}
             className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors hidden sm:block"
           >
-            {focusMode ? <Minimize2 className="w-4 h-4 text-emerald-400" /> : <Maximize2 className="w-4 h-4" />}
+            {focusMode ? <Minimize2 className="w-4 h-4 text-sky-400" /> : <Maximize2 className="w-4 h-4" />}
           </button>
 
           {/* Mobile TOC Toggle */}
@@ -270,11 +332,11 @@ export default function LessonReader() {
             title="Listen with Browser Native Speech Engine (Auto-detects Japanese/Vietnamese & cleans Furigana)"
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
               isSpeechPlayerOpen
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
+                ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-xs'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700/60'
             }`}
           >
-            <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+            <Volume2 className="w-3.5 h-3.5 text-sky-400" />
             <span className="hidden sm:inline">Speech TTS</span>
           </button>
 
@@ -282,9 +344,9 @@ export default function LessonReader() {
           <button
             type="button"
             onClick={handleToggleComplete}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${isCompleted ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60'}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${isCompleted ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60'}`}
           >
-            <BookmarkCheck className={`w-3.5 h-3.5 ${isCompleted ? 'text-emerald-400' : 'text-slate-400'}`} />
+            <BookmarkCheck className={`w-3.5 h-3.5 ${isCompleted ? 'text-sky-400' : 'text-slate-400'}`} />
             <span className="hidden sm:inline">{isCompleted ? 'Completed' : 'Mark Done'}</span>
           </button>
         </div>
@@ -313,7 +375,7 @@ export default function LessonReader() {
           {/* Course Title Badge */}
           {course && (
             <div className="p-4 border-b border-slate-800/80 bg-slate-950/40">
-              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">
+              <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase tracking-wider mb-1">
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>Course</span>
               </div>
@@ -345,18 +407,18 @@ export default function LessonReader() {
                           navigate(course ? `/courses/${course.slug || course.id}/${les.slug || les.id}` : `/reader/${les.id}`);
                           setIsSidebarOpen(false);
                         }}
-                        className={`w-full text-left px-2.5 py-2 rounded-xl flex items-center justify-between gap-2 transition-all cursor-pointer ${isCurrent ? 'bg-emerald-500/15 text-emerald-300 font-semibold border border-emerald-500/30' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`}
+                        className={`w-full text-left px-2.5 py-2 rounded-xl flex items-center justify-between gap-2 transition-all cursor-pointer ${isCurrent ? 'bg-sky-500/15 text-sky-300 font-semibold border border-sky-500/30' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`}
                       >
                         <div className="flex items-center gap-2 truncate">
                           {lesCompleted ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                           ) : (
                             <Circle className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                           )}
                           <span className="truncate">{les.title}</span>
                         </div>
                         {les.audio_url && (
-                          <Volume2 className="w-3 h-3 text-emerald-400/80 shrink-0" />
+                          <Volume2 className="w-3 h-3 text-sky-400/80 shrink-0" />
                         )}
                       </button>
                     );
@@ -388,14 +450,14 @@ export default function LessonReader() {
 
               <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
                 {lesson.audio_url && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-300 border border-sky-500/20">
                     <Volume2 className="w-3.5 h-3.5" />
                     <span>TTS Audio Available</span>
                   </div>
                 )}
                 {isCompleted && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-200 font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-200 font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
                     <span>Completed</span>
                   </div>
                 )}
@@ -409,18 +471,52 @@ export default function LessonReader() {
               lineSpacing={settings.line_spacing}
             />
 
+            {/* Chapter Navigation Controls */}
+            {(prevChapter || nextChapter) && (
+              <div className="mt-12 pt-6 border-t border-slate-800/80 flex items-center justify-between gap-3 text-xs">
+                {prevChapter ? (
+                  <button
+                    type="button"
+                    onClick={() => navigateToChapter(prevChapter)}
+                    className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all cursor-pointer group"
+                  >
+                    <ChevronsLeft className="w-4 h-4 text-sky-400 group-hover:-translate-x-0.5 transition-transform" />
+                    <div className="text-left">
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Chương trước</div>
+                      <div className="truncate max-w-[130px] sm:max-w-[200px] font-medium">{prevChapter.title}</div>
+                    </div>
+                  </button>
+                ) : <div />}
+
+                {nextChapter && (
+                  <button
+                    type="button"
+                    onClick={() => navigateToChapter(nextChapter)}
+                    className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all cursor-pointer group ml-auto text-right"
+                  >
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Chương tiếp theo</div>
+                      <div className="truncate max-w-[130px] sm:max-w-[200px] font-medium">{nextChapter.title}</div>
+                    </div>
+                    <ChevronsRight className="w-4 h-4 text-sky-400 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Bottom Lesson Navigation */}
-            <div className="mt-12 pt-8 border-t border-slate-800 flex items-center justify-between gap-4">
+            <div className="mt-4 pt-4 border-t border-slate-800/60 flex items-center justify-between gap-4">
               {prevLesson ? (
                 <button
                   type="button"
-                  onClick={() => navigate(course ? `/courses/${course.slug || course.id}/${prevLesson?.slug || prevLesson?.id}` : `/reader/${prevLesson?.id}`)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                  onClick={() => navigateToLesson(prevLesson)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all cursor-pointer group"
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span className="truncate max-w-[140px] sm:max-w-[200px]">
-                    {prevLesson.title}
-                  </span>
+                  <ChevronLeft className="w-4 h-4 text-sky-400 group-hover:-translate-x-0.5 transition-transform" />
+                  <div className="text-left">
+                    <span className="text-[10px] text-slate-400 block font-normal">Bài trước</span>
+                    <span className="truncate max-w-[130px] sm:max-w-[200px] block font-medium">{prevLesson.title}</span>
+                  </div>
                 </button>
               ) : (
                 <div />
@@ -429,15 +525,21 @@ export default function LessonReader() {
               {nextLesson && (
                 <button
                   type="button"
-                  onClick={() => navigate(course ? `/courses/${course.slug || course.id}/${nextLesson?.slug || nextLesson?.id}` : `/reader/${nextLesson?.id}`)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer"
+                  onClick={() => navigateToLesson(nextLesson)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-all cursor-pointer shadow-lg shadow-sky-600/20 group"
                 >
-                  <span className="truncate max-w-[140px] sm:max-w-[200px]">
-                    {nextLesson.title}
-                  </span>
-                  <ChevronRight className="w-4 h-4" />
+                  <div className="text-right">
+                    <span className="text-[10px] text-sky-200 block font-normal">Bài tiếp theo</span>
+                    <span className="truncate max-w-[130px] sm:max-w-[200px] block font-medium">{nextLesson.title}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-sky-200 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               )}
+            </div>
+
+            {/* Inline Comments Section */}
+            <div className="mt-14 pt-8 border-t border-slate-800">
+              <LessonCommentsSection lessonId={lesson.id} />
             </div>
           </div>
         </main>
@@ -448,7 +550,7 @@ export default function LessonReader() {
         {lesson.toc_data && lesson.toc_data.length > 0 && !focusMode && (
           <aside className="hidden lg:block w-64 shrink-0 p-6 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto text-xs">
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <ListTree className="w-3.5 h-3.5 text-emerald-400" />
+              <ListTree className="w-3.5 h-3.5 text-sky-400" />
               <span>Table of Contents</span>
             </div>
 
@@ -469,7 +571,7 @@ export default function LessonReader() {
                         setActiveHeadingId(item.id);
                       }
                     }}
-                    className={`block py-1 text-[11px] leading-relaxed transition-colors truncate rounded-md ${indentClass} ${isActive ? 'text-emerald-400 font-bold border-l-2 border-emerald-400 pl-2 bg-emerald-500/10' : 'text-slate-400 hover:text-slate-200'}`}
+                    className={`block py-1 text-[11px] leading-relaxed transition-colors truncate rounded-md ${indentClass} ${isActive ? 'text-sky-400 font-bold border-l-2 border-sky-400 pl-2 bg-sky-500/10' : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     {item.text}
                   </a>
@@ -490,7 +592,7 @@ export default function LessonReader() {
           <div className="fixed inset-x-0 bottom-0 z-50 p-6 bg-slate-900 border-t border-slate-800 rounded-t-3xl max-h-[70vh] overflow-y-auto lg:hidden animate-in slide-in-from-bottom">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
               <span className="font-bold text-sm text-white flex items-center gap-2">
-                <ListTree className="w-4 h-4 text-emerald-400" />
+                <ListTree className="w-4 h-4 text-sky-400" />
                 Table of Contents
               </span>
               <button
@@ -513,7 +615,7 @@ export default function LessonReader() {
                     const el = document.getElementById(item.id);
                     if (el) el.scrollIntoView({ behavior: 'smooth' });
                   }}
-                  className={`block py-1.5 text-xs text-slate-300 hover:text-emerald-400 ${item.level === 3 ? 'pl-4' : 'pl-1'}`}
+                  className={`block py-1.5 text-xs text-slate-300 hover:text-sky-400 ${item.level === 3 ? 'pl-4' : 'pl-1'}`}
                 >
                   {item.text}
                 </a>
@@ -540,66 +642,121 @@ export default function LessonReader() {
         />
       )}
 
-      {/* Mobile Docked Bottom Action Bar (Thumb Reachable) */}
-      <div className="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 border-t border-slate-800 backdrop-blur-xl px-2 py-1.5 flex items-center justify-around lg:hidden shadow-2xl">
+      {/* Personal Notes Slide-over Drawer */}
+      <LessonNotesDrawer
+        lessonId={lesson.id}
+        lessonTitle={lesson.title}
+        isOpen={isNotesDrawerOpen}
+        onClose={() => setIsNotesDrawerOpen(false)}
+      />
+
+      {/* Lesson Comments Slide-over Drawer (for mobile / fast popup) */}
+      <LessonCommentsSection
+        lessonId={lesson.id}
+        isDrawer={true}
+        isOpen={isCommentsDrawerOpen}
+        onClose={() => setIsCommentsDrawerOpen(false)}
+      />
+
+      {/* Mobile Docked Bottom Action Bar (Sleek Glassmorphic 7-action thumb-reachable bar) */}
+      <div className="fixed bottom-0 inset-x-0 z-30 h-16 bg-slate-900/95 border-t border-slate-800 backdrop-blur-xl px-2 flex items-center justify-around lg:hidden shadow-2xl">
+        {/* 1. Prev Lesson */}
+        <button
+          type="button"
+          disabled={!prevLesson}
+          onClick={() => prevLesson && navigateToLesson(prevLesson)}
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer ${
+            prevLesson
+              ? 'text-slate-300 hover:text-sky-400 active:scale-95'
+              : 'text-slate-600 opacity-40 cursor-not-allowed'
+          }`}
+          title={prevLesson ? `Bài trước: ${prevLesson.title}` : 'Không có bài trước'}
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <span className="text-[10px] font-medium tracking-tight mt-0.5">Trước</span>
+        </button>
+
+        {/* 2. Lessons Menu */}
         <button
           type="button"
           onClick={() => setIsSidebarOpen(true)}
-          className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center p-1.5 rounded-xl text-slate-400 hover:text-sky-300 transition-colors cursor-pointer active:scale-95"
         >
           <Menu className="w-4 h-4" />
-          <span className="text-[10px] font-medium">Lessons</span>
+          <span className="text-[10px] font-medium tracking-tight mt-0.5">Mục lục</span>
         </button>
 
+        {/* 3. Speech TTS */}
         <button
           type="button"
           onClick={() => setIsSpeechPlayerOpen(!isSpeechPlayerOpen)}
-          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-colors cursor-pointer ${
-            isSpeechPlayerOpen ? 'text-emerald-400 font-bold' : 'text-slate-400 hover:text-white'
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            isSpeechPlayerOpen
+              ? 'text-sky-400 font-bold bg-sky-500/10'
+              : 'text-slate-400 hover:text-sky-300'
           }`}
         >
           <Volume2 className="w-4 h-4" />
-          <span className="text-[10px] font-medium">Speech</span>
+          <span className="text-[10px] font-medium tracking-tight mt-0.5">Đọc TTS</span>
         </button>
 
-        {lesson.toc_data && lesson.toc_data.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setIsTOCOpen(true)}
-            className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
-          >
-            <ListTree className="w-4 h-4" />
-            <span className="text-[10px] font-medium">Outline</span>
-          </button>
-        )}
+        {/* 4. Sổ tay cá nhân (Notes) */}
+        <button
+          type="button"
+          onClick={() => setIsNotesDrawerOpen(true)}
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            isNotesDrawerOpen
+              ? 'text-sky-400 font-bold bg-sky-500/10'
+              : 'text-slate-400 hover:text-sky-300'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span className="text-[10px] font-medium tracking-tight mt-0.5">Ghi chú</span>
+        </button>
 
+        {/* 5. Bình luận / Thảo luận (Comments) */}
+        <button
+          type="button"
+          onClick={() => setIsCommentsDrawerOpen(true)}
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            isCommentsDrawerOpen
+              ? 'text-cyan-400 font-bold bg-cyan-500/10'
+              : 'text-slate-400 hover:text-cyan-300'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span className="text-[10px] font-medium tracking-tight mt-0.5">Hỏi đáp</span>
+        </button>
+
+        {/* 6. Hoàn thành / Mark Done */}
         <button
           type="button"
           onClick={handleToggleComplete}
-          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-colors cursor-pointer ${
-            isCompleted ? 'text-emerald-400 font-bold' : 'text-slate-400 hover:text-white'
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            isCompleted
+              ? 'text-sky-400 font-bold bg-sky-500/10'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           <BookmarkCheck className="w-4 h-4" />
-          <span className="text-[10px] font-medium">{isCompleted ? 'Done' : 'Mark'}</span>
+          <span className="text-[10px] font-medium tracking-tight mt-0.5">{isCompleted ? 'Đã học' : 'Xong'}</span>
         </button>
 
-        {nextLesson && (
-          <button
-            type="button"
-            onClick={() =>
-              navigate(
-                course
-                  ? `/courses/${course.slug || course.id}/${nextLesson.slug || nextLesson.id}`
-                  : `/reader/${nextLesson.id}`
-              )
-            }
-            className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer font-bold"
-          >
-            <ChevronRight className="w-4 h-4" />
-            <span className="text-[10px] font-medium">Next</span>
-          </button>
-        )}
+        {/* 7. Next Lesson */}
+        <button
+          type="button"
+          disabled={!nextLesson}
+          onClick={() => nextLesson && navigateToLesson(nextLesson)}
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer ${
+            nextLesson
+              ? 'text-sky-400 hover:text-sky-300 font-bold active:scale-95'
+              : 'text-slate-600 opacity-40 cursor-not-allowed'
+          }`}
+          title={nextLesson ? `Bài kế tiếp: ${nextLesson.title}` : 'Không có bài kế'}
+        >
+          <ChevronRight className="w-4 h-4" />
+          <span className="text-[10px] font-bold tracking-tight mt-0.5">Tiếp</span>
+        </button>
       </div>
     </div>
   );

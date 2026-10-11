@@ -67,7 +67,7 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({
         </button>
 
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
             <BookOpen className="w-5 h-5" />
           </div>
           <div>
@@ -85,7 +85,7 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              Course Title <span className="text-emerald-400">*</span>
+              Course Title <span className="text-sky-400">*</span>
             </label>
             <input
               type="text"
@@ -93,7 +93,7 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. JSST Speaking Mastery, JLPT N1..."
-              className="w-full bg-slate-800/70 border border-slate-700/60 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-800/70 border border-slate-700/60 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
             />
           </div>
 
@@ -106,7 +106,7 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Summary of this course, objectives, audience..."
-              className="w-full bg-slate-800/70 border border-slate-700/60 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
+              className="w-full bg-slate-800/70 border border-slate-700/60 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 resize-none"
             />
           </div>
 
@@ -125,7 +125,7 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({
                     onClick={() => setSelectedIcon(item.id)}
                     className={`flex-1 py-2 rounded-xl flex flex-col items-center gap-1 text-[11px] font-medium border transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 shadow-xs'
+                        ? 'bg-sky-500/15 border-sky-500 text-sky-300 shadow-xs'
                         : 'bg-slate-800/50 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                     }`}
                   >
@@ -148,7 +148,7 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-50 cursor-pointer"
+              className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 transition-all disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? 'Creating...' : 'Create Course'}
             </button>

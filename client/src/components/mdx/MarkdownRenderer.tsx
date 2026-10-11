@@ -69,7 +69,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }
 
             return (
-              <code className="px-1.5 py-0.5 rounded-md bg-slate-800 text-emerald-300 font-mono text-[0.88em] border border-slate-700/60" {...props}>
+              <code className="px-1.5 py-0.5 rounded-md bg-slate-800 text-sky-300 font-mono text-[0.88em] border border-slate-700/60" {...props}>
                 {children}
               </code>
             );
@@ -101,8 +101,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }
             if (text.includes('[!TIP]')) {
               return (
-                <div className="my-4 p-4 rounded-xl alert-tip text-emerald-200 text-sm flex gap-3 items-start">
-                  <Lightbulb className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="my-4 p-4 rounded-xl alert-tip text-cyan-200 text-sm flex gap-3 items-start">
+                  <Lightbulb className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                   <div className="flex-1">{children}</div>
                 </div>
               );
@@ -133,7 +133,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }
 
             return (
-              <blockquote className="my-4 border-l-3 border-emerald-500/40 bg-slate-800/20 pl-4 py-1.5 italic text-slate-300 rounded-r-lg">
+              <blockquote className="my-4 border-l-3 border-sky-500/40 bg-slate-800/20 pl-4 py-1.5 italic text-slate-300 rounded-r-lg">
                 {children}
               </blockquote>
             );
@@ -163,7 +163,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 href={href}
                 target="_blank"
                 rel="noreferrer"
-                className="text-emerald-400 hover:text-emerald-300 underline underline-offset-3 decoration-emerald-500/30 hover:decoration-emerald-400 font-medium transition-colors"
+                className="text-sky-400 hover:text-sky-300 underline underline-offset-3 decoration-sky-500/30 hover:decoration-sky-400 font-medium transition-colors"
                 {...props}
               >
                 {children}

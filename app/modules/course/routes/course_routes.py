@@ -9,7 +9,7 @@ import httpx
 import urllib.parse
 
 from app.core.db import get_db
-from app.modules.course.models import Course, Chapter, Lesson, UserReadProgress
+from app.modules.course.models import Course, Chapter, Lesson, UserReadProgress, LessonComment, UserLessonNote
 from app.modules.auth.routes.auth_routes import get_current_user_optional, get_current_admin
 from app.modules.auth.models import User
 from app.modules.import_export.services.batch_importer import BatchImporter
@@ -577,4 +577,125 @@ async def stream_tts(text: str, lang: str = "vi"):
         logging.getLogger("uvicorn.error").error(f"TTS stream error: {e}")
 
     raise HTTPException(status_code=500, detail="Failed to synthesize speech audio")
+    return Response(status_code=500)
+
+class CommentCreateRequest(BaseModel):
+    content: str
+    parent_id: Optional[int] = None
+
+class NoteUpdateRequest(BaseModel):
+    content: str
+
+# =========================================================================
+# LESSON COMMENTS
+# =========================================================================
+@router.get("/lessons/{lesson_id}/comments")
+async def get_lesson_comments(lesson_id: int, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(
+        select(LessonComment, User)
+        .outerjoin(User, LessonComment.user_id == User.id)
+        .where(LessonComment.lesson_id == lesson_id)
+        .order_by(LessonComment.created_at.asc())
+    )
+    comments = []
+    for comment, user in res.all():
+        comments.append(comment.to_dict(user=user))
+    return comments
+
+@router.post("/lessons/{lesson_id}/comments")
+async def post_lesson_comment(
+    lesson_id: int,
+    data: CommentCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    user_opt: Optional[User] = Depends(get_current_user_optional)
+):
+    if not data.content.strip():
+        raise HTTPException(status_code=400, detail="Comment content cannot be empty")
+
+    les_res = await db.execute(select(Lesson).where(Lesson.id == lesson_id))
+    lesson = les_res.scalar_one_or_none()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    user_id = user_opt.id if user_opt else 1
+    comment = LessonComment(
+        lesson_id=lesson_id,
+        user_id=user_id,
+        parent_id=data.parent_id,
+        content=data.content.strip()
+    )
+    db.add(comment)
+    await db.commit()
+    await db.refresh(comment)
+    return comment.to_dict(user=user_opt)
+
+@router.delete("/lessons/{lesson_id}/comments/{comment_id}")
+async def delete_lesson_comment(
+    lesson_id: int,
+    comment_id: int,
+    db: AsyncSession = Depends(get_db),
+    user_opt: Optional[User] = Depends(get_current_user_optional)
+):
+    res = await db.execute(select(LessonComment).where(LessonComment.id == comment_id, LessonComment.lesson_id == lesson_id))
+    comment = res.scalar_one_or_none()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    if user_opt:
+        if user_opt.role != "admin" and comment.user_id != user_opt.id:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+
+    await db.delete(comment)
+    await db.commit()
+    return {"status": "success", "message": "Comment deleted"}
+
+# =========================================================================
+# USER LESSON NOTES (Personal Notebook)
+# =========================================================================
+@router.get("/lessons/{lesson_id}/note")
+async def get_user_lesson_note(
+    lesson_id: int,
+    db: AsyncSession = Depends(get_db),
+    user_opt: Optional[User] = Depends(get_current_user_optional)
+):
+    user_id = user_opt.id if user_opt else 1
+    res = await db.execute(
+        select(UserLessonNote).where(
+            UserLessonNote.lesson_id == lesson_id,
+            UserLessonNote.user_id == user_id
+        )
+    )
+    note = res.scalar_one_or_none()
+    if not note:
+        return {"id": None, "lesson_id": lesson_id, "user_id": user_id, "content": "", "updated_at": None}
+    return note.to_dict()
+
+@router.put("/lessons/{lesson_id}/note")
+async def save_user_lesson_note(
+    lesson_id: int,
+    data: NoteUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user_opt: Optional[User] = Depends(get_current_user_optional)
+):
+    user_id = user_opt.id if user_opt else 1
+    res = await db.execute(
+        select(UserLessonNote).where(
+            UserLessonNote.lesson_id == lesson_id,
+            UserLessonNote.user_id == user_id
+        )
+    )
+    note = res.scalar_one_or_none()
+    if note:
+        note.content = data.content
+    else:
+        note = UserLessonNote(
+            lesson_id=lesson_id,
+            user_id=user_id,
+            content=data.content
+        )
+        db.add(note)
+    await db.commit()
+    await db.refresh(note)
+    return note.to_dict()
+
 

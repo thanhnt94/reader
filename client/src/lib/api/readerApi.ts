@@ -78,6 +78,30 @@ export interface UserSettings {
   auto_scroll: boolean;
 }
 
+export interface LessonComment {
+  id: number;
+  lesson_id: number;
+  user_id: number;
+  parent_id?: number | null;
+  content: string;
+  created_at: string;
+  updated_at?: string;
+  user?: {
+    username: string;
+    full_name?: string;
+    role: string;
+  };
+}
+
+export interface UserLessonNote {
+  id?: number | null;
+  lesson_id: number;
+  user_id: number;
+  content: string;
+  created_at?: string;
+  updated_at?: string | null;
+}
+
 export const readerApi = {
   // Auth
   getAuthConfig: async (): Promise<AuthConfig> => {
@@ -208,6 +232,33 @@ export const readerApi = {
   },
   updateUserSettings: async (settings: Partial<UserSettings>): Promise<UserSettings> => {
     const res = await apiClient.post('/api/v1/user/settings', settings);
+    return res.data;
+  },
+
+  // Comments
+  getLessonComments: async (lessonId: number): Promise<LessonComment[]> => {
+    const res = await apiClient.get(`/api/v1/lessons/${lessonId}/comments`);
+    return res.data;
+  },
+  postLessonComment: async (lessonId: number, content: string, parentId?: number | null): Promise<LessonComment> => {
+    const res = await apiClient.post(`/api/v1/lessons/${lessonId}/comments`, {
+      content,
+      parent_id: parentId,
+    });
+    return res.data;
+  },
+  deleteLessonComment: async (lessonId: number, commentId: number) => {
+    const res = await apiClient.delete(`/api/v1/lessons/${lessonId}/comments/${commentId}`);
+    return res.data;
+  },
+
+  // Personal Notes
+  getUserLessonNote: async (lessonId: number): Promise<UserLessonNote> => {
+    const res = await apiClient.get(`/api/v1/lessons/${lessonId}/note`);
+    return res.data;
+  },
+  saveUserLessonNote: async (lessonId: number, content: string): Promise<UserLessonNote> => {
+    const res = await apiClient.put(`/api/v1/lessons/${lessonId}/note`, { content });
     return res.data;
   },
 };

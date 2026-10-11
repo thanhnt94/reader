@@ -34,10 +34,10 @@ export const VocabCard: React.FC<VocabCardProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-500/40 font-medium text-sm transition-all duration-200 cursor-pointer shadow-xs active:scale-95"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-300 hover:bg-sky-500/20 hover:border-sky-500/40 font-medium text-sm transition-all duration-200 cursor-pointer shadow-xs active:scale-95"
       >
         <span className="font-semibold">{word}</span>
-        {furigana && <span className="text-xs text-emerald-400/80 font-normal">({furigana})</span>}
+        {furigana && <span className="text-xs text-sky-400/80 font-normal">({furigana})</span>}
       </button>
 
       {/* Floating Insight Popover */}
@@ -49,11 +49,11 @@ export const VocabCard: React.FC<VocabCardProps> = ({
               <div>
                 <div className="text-base font-bold text-white flex items-center gap-1.5">
                   {word}
-                  {furigana && <span className="text-xs text-emerald-400 font-normal">[{furigana}]</span>}
+                  {furigana && <span className="text-xs text-sky-400 font-normal">[{furigana}]</span>}
                 </div>
                 {pos && <span className="text-[10px] uppercase font-semibold text-slate-400">{pos}</span>}
               </div>
-              <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/40 text-[10px] font-medium">
+              <span className="px-1.5 py-0.5 rounded bg-sky-950 text-sky-400 border border-sky-800/40 text-[10px] font-medium">
                 Vocaburn
               </span>
             </div>
@@ -68,7 +68,7 @@ export const VocabCard: React.FC<VocabCardProps> = ({
               <button
                 type="button"
                 onClick={handleQuickSave}
-                className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-[11px] transition-colors"
               >
                 {saved ? <Check className="w-3.5 h-3.5 text-white" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
                 {saved ? 'Saved!' : 'Save Word'}

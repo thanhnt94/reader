@@ -362,7 +362,7 @@ export default function LiveEditor() {
           </Link>
 
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
             <span className="text-xs font-bold text-white hidden md:inline">
               {lessonId ? `Editing Lesson #${lessonId}` : 'Create New Lesson'}
             </span>
@@ -372,7 +372,7 @@ export default function LiveEditor() {
             <div
               className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold ${
                 statusMsg.type === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
                   : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
               }`}
             >
@@ -390,7 +390,7 @@ export default function LiveEditor() {
               onClick={() => handleTabChange('visual')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'visual'
-                  ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/20'
+                  ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="WordPress Visual WYSIWYG Editor"
@@ -404,7 +404,7 @@ export default function LiveEditor() {
               onClick={() => handleTabChange('code')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'code'
-                  ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/20'
+                  ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="WordPress Text & Markdown Code View (Paste raw code/markdown here)"
@@ -418,7 +418,7 @@ export default function LiveEditor() {
               onClick={() => handleTabChange('split')}
               className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'split'
-                  ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/20'
+                  ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="Side-by-side Split View"
@@ -432,7 +432,7 @@ export default function LiveEditor() {
               onClick={() => handleTabChange('preview')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'preview'
-                  ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/20'
+                  ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="Full Student Reading Preview"
@@ -446,7 +446,7 @@ export default function LiveEditor() {
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             <Save className="w-4 h-4" />
             <span>{isSaving ? 'Đang lưu...' : 'Lưu bài (Ctrl+S)'}</span>
@@ -461,7 +461,7 @@ export default function LiveEditor() {
           value={lessonTitle}
           onChange={(e) => setLessonTitle(e.target.value)}
           placeholder="Nhập tiêu đề bài học (Enter lesson title here)..."
-          className="flex-1 min-w-[240px] bg-slate-800/80 border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-sm font-semibold placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+          className="flex-1 min-w-[240px] bg-slate-800/80 border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-sm font-semibold placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-colors"
         />
 
         {/* Course Select */}
@@ -472,7 +472,7 @@ export default function LiveEditor() {
               setSelectedCourseId(Number(e.target.value) || '');
               setSelectedChapterId('');
             }}
-            className="bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 max-w-[150px] truncate"
+            className="bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-sky-500 max-w-[150px] truncate"
           >
             <option value="">Chọn Khóa học...</option>
             {courses.map((c) => (
@@ -489,7 +489,7 @@ export default function LiveEditor() {
             value={selectedChapterId}
             onChange={(e) => setSelectedChapterId(Number(e.target.value) || '')}
             disabled={!selectedCourseId}
-            className="bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-40 max-w-[160px] truncate"
+            className="bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-40 max-w-[160px] truncate"
           >
             <option value="">Chọn Chapter...</option>
             {availableChapters.map((ch) => (
@@ -613,7 +613,7 @@ export default function LiveEditor() {
           title="Insert Table"
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
         >
-          <TableIcon className="w-3.5 h-3.5 text-emerald-400" />
+          <TableIcon className="w-3.5 h-3.5 text-sky-400" />
           <span>Bảng</span>
         </button>
 
@@ -631,9 +631,9 @@ export default function LiveEditor() {
           type="button"
           onClick={() => setIsFuriganaModalOpen(true)}
           title="Insert Japanese Ruby (Furigana)"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 text-xs font-semibold border border-sky-500/30 transition-colors cursor-pointer"
         >
-          <Languages className="w-3.5 h-3.5 text-emerald-400" />
+          <Languages className="w-3.5 h-3.5 text-sky-400" />
           <span>Furigana</span>
         </button>
 
@@ -651,7 +651,7 @@ export default function LiveEditor() {
           <button
             type="button"
             onClick={() => handleInsertAlert('TIP')}
-            className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold hover:bg-emerald-500/20"
+            className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[11px] font-semibold hover:bg-cyan-500/20"
           >
             [!TIP]
           </button>
@@ -666,7 +666,7 @@ export default function LiveEditor() {
       </div>
 
       {/* Main Editing Canvas Area */}
-      <div className="flex-1 flex min-h-0 bg-[#0d1117] relative overflow-hidden">
+      <div className="flex-1 flex min-h-0 bg-[#070a13] relative overflow-hidden">
         {/* ========================================================= */}
         {/* TAB 1: WordPress Visual WYSIWYG Editor                     */}
         {/* ========================================================= */}
@@ -695,7 +695,7 @@ export default function LiveEditor() {
         <div className={`${activeTab === 'code' ? 'flex flex-col' : 'hidden'} flex-1 h-full w-full`}>
           <div className="px-6 py-2 bg-slate-900/80 border-b border-slate-800 text-[11px] font-mono text-slate-400 flex items-center justify-between shrink-0">
             <span className="flex items-center gap-2">
-              <FileCode className="w-3.5 h-3.5 text-emerald-400" />
+              <FileCode className="w-3.5 h-3.5 text-sky-400" />
               Mã nguồn Markdown & HTML (WordPress Text View)
             </span>
             <span className="text-slate-500">
@@ -707,7 +707,7 @@ export default function LiveEditor() {
             value={markdown}
             onChange={(e) => setMarkdown(e.target.value)}
             placeholder="Dán mã nguồn Markdown hoặc HTML bài học tại đây (Paste code/markdown here)..."
-            className="flex-1 w-full p-6 bg-[#0a0d14] text-slate-200 font-mono text-xs sm:text-sm leading-relaxed resize-none focus:outline-none selection:bg-emerald-500/30 selection:text-white"
+            className="flex-1 w-full p-6 bg-[#0a0d14] text-slate-200 font-mono text-xs sm:text-sm leading-relaxed resize-none focus:outline-none selection:bg-sky-500/30 selection:text-white"
             spellCheck={false}
           />
         </div>
@@ -729,8 +729,8 @@ export default function LiveEditor() {
               spellCheck={false}
             />
           </div>
-          <div className="w-1/2 h-full flex flex-col bg-[#0b0f19] overflow-y-auto p-6">
-            <div className="text-[11px] font-mono text-emerald-400 uppercase tracking-wider mb-4">
+          <div className="w-1/2 h-full flex flex-col bg-[#070a13] overflow-y-auto p-6">
+            <div className="text-[11px] font-mono text-sky-400 uppercase tracking-wider mb-4">
               Live Rendered Preview
             </div>
             <MarkdownRenderer content={markdown} />
@@ -740,10 +740,10 @@ export default function LiveEditor() {
         {/* ========================================================= */}
         {/* TAB 4: Full Reading Presentation Preview                  */}
         {/* ========================================================= */}
-        <div className={`${activeTab === 'preview' ? 'block' : 'hidden'} flex-1 h-full overflow-y-auto p-8 bg-[#0b0f19]`}>
+        <div className={`${activeTab === 'preview' ? 'block' : 'hidden'} flex-1 h-full overflow-y-auto p-8 bg-[#070a13]`}>
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="border-b border-slate-800 pb-4">
-              <span className="px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase">
+              <span className="px-2.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[10px] font-bold uppercase">
                 Preview
               </span>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-2">
@@ -761,7 +761,7 @@ export default function LiveEditor() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Code2 className="w-4 h-4 text-emerald-400" />
+                <Code2 className="w-4 h-4 text-sky-400" />
                 Chèn khối mã nguồn (Insert Code Block)
               </h3>
               <button
@@ -779,7 +779,7 @@ export default function LiveEditor() {
                 <select
                   value={codeLanguage}
                   onChange={(e) => setCodeLanguage(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
                 >
                   <option value="javascript">JavaScript</option>
                   <option value="typescript">TypeScript</option>
@@ -800,7 +800,7 @@ export default function LiveEditor() {
                   value={codeSnippet}
                   onChange={(e) => setCodeSnippet(e.target.value)}
                   placeholder="Dán code của bạn vào đây..."
-                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-emerald-300 focus:outline-none focus:border-emerald-500 resize-none"
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-sky-300 focus:outline-none focus:border-sky-500 resize-none"
                 />
               </div>
             </div>
@@ -816,7 +816,7 @@ export default function LiveEditor() {
               <button
                 type="button"
                 onClick={handleInsertCodeBlock}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-lg shadow-emerald-600/25"
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-xs font-bold text-white shadow-lg shadow-sky-600/25"
               >
                 Chèn vào bài viết
               </button>
@@ -831,7 +831,7 @@ export default function LiveEditor() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Languages className="w-4 h-4 text-emerald-400" />
+                <Languages className="w-4 h-4 text-sky-400" />
                 Chèn Furigana (Japanese Ruby)
               </h3>
               <button
@@ -851,7 +851,7 @@ export default function LiveEditor() {
                   value={furiganaKanji}
                   onChange={(e) => setFuriganaKanji(e.target.value)}
                   placeholder="Ví dụ: 季節 hoặc 理由"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500"
                 />
               </div>
 
@@ -862,16 +862,16 @@ export default function LiveEditor() {
                   value={furiganaReading}
                   onChange={(e) => setFuriganaReading(e.target.value)}
                   placeholder="Ví dụ: きせつ hoặc りゆう"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500"
                 />
               </div>
 
               {furiganaKanji && (
                 <div className="p-3 bg-slate-950 rounded-xl text-center">
                   <span className="text-xs text-slate-500 block mb-1">Xem trước:</span>
-                  <ruby className="text-xl font-bold text-emerald-300">
+                  <ruby className="text-xl font-bold text-sky-300">
                     {furiganaKanji}
-                    <rt className="text-xs text-emerald-400">{furiganaReading}</rt>
+                    <rt className="text-xs text-sky-400">{furiganaReading}</rt>
                   </ruby>
                 </div>
               )}
@@ -889,7 +889,7 @@ export default function LiveEditor() {
                 type="button"
                 onClick={handleInsertFurigana}
                 disabled={!furiganaKanji.trim()}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-xs font-bold text-white shadow-lg shadow-emerald-600/25"
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-xs font-bold text-white shadow-lg shadow-sky-600/25"
               >
                 Chèn Furigana
               </button>

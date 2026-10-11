@@ -8,7 +8,11 @@ import {
   Volume2,
   X,
   Languages,
-  Sparkles
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 
 export type DetectedLang = 'ja-JP' | 'vi-VN' | 'en-US';
@@ -234,6 +238,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [speed, setSpeed] = useState(1.0);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -470,19 +475,80 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
   if (!isOpen) return null;
 
+  // Mini-pill collapsed view (completely non-intrusive on mobile!)
+  if (isCollapsed) {
+    return (
+      <div className="fixed bottom-[70px] inset-x-3 sm:bottom-4 sm:inset-x-auto sm:right-6 max-w-sm ml-auto z-50 animate-in slide-in-from-bottom duration-200 font-sans">
+        <div className="bg-slate-900/95 border border-sky-500/40 rounded-2xl p-2 px-3 shadow-2xl backdrop-blur-xl text-slate-100 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+            <span className="text-xs font-bold text-white truncate max-w-[120px]">
+              #{currentIndex + 1}/{activeSentences.length}
+            </span>
+            <span className="text-[10px] text-sky-400 font-mono">
+              {currentSentence?.lang === 'ja-JP' ? '🇯🇵' : currentSentence?.lang === 'vi-VN' ? '🇻🇳' : '🇺🇸'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isPlaying ? (
+              <button
+                type="button"
+                onClick={handlePause}
+                className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold"
+              >
+                <Pause className="w-3.5 h-3.5 fill-current" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePlay}
+                className="w-7 h-7 rounded-lg bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold"
+              >
+                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Mở rộng trình phát"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                handleStop();
+                onClose();
+              }}
+              className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+              title="Đóng"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded View
   return (
-    <div className="fixed bottom-2 inset-x-2 sm:bottom-4 sm:inset-x-4 max-w-3xl mx-auto z-50 animate-in slide-in-from-bottom duration-300 font-sans">
-      <div className="bg-slate-900/95 border border-slate-700/80 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xl backdrop-blur-2xl text-slate-100 flex flex-col gap-2.5 sm:gap-3">
+    <div className="fixed bottom-[72px] inset-x-2 sm:bottom-4 sm:inset-x-4 max-w-2xl mx-auto z-50 animate-in slide-in-from-bottom duration-300 font-sans">
+      <div className="bg-slate-900/95 border border-sky-900/50 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xl backdrop-blur-2xl text-slate-100 flex flex-col gap-2.5">
         {/* Header Bar */}
         <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <div className="w-7 h-7 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+              <Volume2 className="w-3.5 h-3.5" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-xs text-white truncate max-w-[120px] sm:max-w-xs">{title}</span>
-                <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-[9px] sm:text-[10px] font-semibold text-emerald-400 border border-slate-700/60 shrink-0">
+                <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-[9px] font-semibold text-sky-400 border border-slate-700/60 shrink-0">
                   Multilingual TTS
                 </span>
               </div>
@@ -491,7 +557,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
           <div className="flex items-center gap-1 shrink-0">
             {/* Filter Mode Selector */}
-            <div className="flex rounded-xl bg-slate-800 p-0.5 text-[10px] sm:text-[11px] font-semibold">
+            <div className="flex rounded-xl bg-slate-800 p-0.5 text-[10px] font-semibold">
               <button
                 type="button"
                 onClick={() => {
@@ -500,7 +566,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                   if (isPlaying) handleStop();
                 }}
                 className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                  filterMode === 'all' ? 'bg-slate-700 text-emerald-300 shadow-xs' : 'text-slate-400 hover:text-white'
+                  filterMode === 'all' ? 'bg-slate-700 text-sky-300 shadow-xs' : 'text-slate-400 hover:text-white'
                 }`}
                 title="Read all sentences"
               >
@@ -514,7 +580,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                   if (isPlaying) handleStop();
                 }}
                 className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                  filterMode === 'ja' ? 'bg-slate-700 text-emerald-300 shadow-xs' : 'text-slate-400 hover:text-white'
+                  filterMode === 'ja' ? 'bg-slate-700 text-sky-300 shadow-xs' : 'text-slate-400 hover:text-white'
                 }`}
                 title="Read Japanese sentences only"
               >
@@ -528,7 +594,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                   if (isPlaying) handleStop();
                 }}
                 className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                  filterMode === 'vi' ? 'bg-slate-700 text-emerald-300 shadow-xs' : 'text-slate-400 hover:text-white'
+                  filterMode === 'vi' ? 'bg-slate-700 text-sky-300 shadow-xs' : 'text-slate-400 hover:text-white'
                 }`}
                 title="Read Vietnamese sentences only"
               >
@@ -538,11 +604,21 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
             <button
               type="button"
+              onClick={() => setIsCollapsed(true)}
+              className="p-1 sm:p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Thu nhỏ thanh phát"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 handleStop();
                 onClose();
               }}
               className="p-1 sm:p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Đóng trình phát"
             >
               <X className="w-4 h-4" />
             </button>
@@ -550,13 +626,13 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
         </div>
 
         {/* Live Active Sentence Display */}
-        <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-slate-950/60 border border-slate-800/80 min-h-[50px] sm:min-h-[56px] flex flex-col justify-center">
+        <div className="p-2 sm:p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 min-h-[46px] flex flex-col justify-center">
           {currentSentence ? (
             <div className="space-y-1">
-              <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-slate-400">
+              <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <span
-                    className={`px-1.5 py-0.2 rounded-md font-mono text-[9px] sm:text-[10px] font-bold ${
+                    className={`px-1.5 py-0.2 rounded-md font-mono text-[9px] font-bold ${
                       currentSentence.lang === 'ja-JP'
                         ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                         : currentSentence.lang === 'vi-VN'
@@ -574,7 +650,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                     #{currentIndex + 1} / {activeSentences.length}
                   </span>
                 </span>
-                <span className="text-[9px] sm:text-[10px] text-slate-500">
+                <span className="text-[9px] text-slate-500">
                   {isPlaying ? 'Speaking...' : isPaused ? 'Paused' : 'Ready'}
                 </span>
               </div>
@@ -583,7 +659,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
               </p>
             </div>
           ) : (
-            <div className="text-center text-xs text-slate-500 py-1.5">
+            <div className="text-center text-xs text-slate-500 py-1">
               No speech sentences found in this article.
             </div>
           )}
@@ -597,7 +673,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
               type="button"
               onClick={handlePrev}
               disabled={currentIndex <= 0}
-              className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
+              className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
               title="Previous Sentence"
             >
               <SkipBack className="w-4 h-4" />
@@ -607,20 +683,20 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
               <button
                 type="button"
                 onClick={handlePause}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
                 title="Pause"
               >
-                <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
+                <Pause className="w-4 h-4 fill-current" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handlePlay}
                 disabled={activeSentences.length === 0}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-600/30 transition-all cursor-pointer disabled:opacity-40"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold shadow-lg shadow-sky-600/30 transition-all cursor-pointer disabled:opacity-40"
                 title="Play Audio"
               >
-                <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />
+                <Play className="w-4 h-4 fill-current ml-0.5" />
               </button>
             )}
 
@@ -628,7 +704,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
               type="button"
               onClick={handleNext}
               disabled={currentIndex >= activeSentences.length - 1}
-              className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
+              className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
               title="Next Sentence"
             >
               <SkipForward className="w-4 h-4" />
@@ -637,7 +713,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
             <button
               type="button"
               onClick={handleStop}
-              className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
               title="Stop"
             >
               <Square className="w-4 h-4" />
@@ -645,7 +721,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
           </div>
 
           {/* Speed Selector */}
-          <div className="flex items-center gap-1 bg-slate-800/80 p-0.5 sm:p-1 rounded-xl text-[10px] sm:text-[11px] font-bold">
+          <div className="flex items-center gap-1 bg-slate-800/80 p-0.5 rounded-xl text-[10px] font-bold">
             <span className="text-slate-400 px-1 text-[9px] uppercase hidden xs:inline">Speed:</span>
             {[0.8, 1.0, 1.25, 1.5].map((s) => (
               <button
@@ -653,7 +729,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                 type="button"
                 onClick={() => handleSpeedChange(s)}
                 className={`px-1.5 sm:px-2 py-0.5 rounded-lg transition-colors cursor-pointer ${
-                  speed === s ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                  speed === s ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 {s}x

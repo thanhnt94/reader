@@ -5,7 +5,7 @@ from app.core.db import engine, Base, SessionLocal
 from app.core.config import settings
 from app.modules.auth.models import User
 from app.modules.sso_module.models import SSOConfig
-from app.modules.course.models import Course, Chapter, Lesson, UserReadProgress
+from app.modules.course.models import Course, Chapter, Lesson, UserReadProgress, LessonComment, UserLessonNote
 from app.modules.settings.models import UserGlobalSettings
 from app.modules.auth.routes.auth_routes import hash_pw
 

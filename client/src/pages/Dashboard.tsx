@@ -186,26 +186,26 @@ export default function Dashboard() {
       {/* Top Header */}
       <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-emerald-600/20">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-cyan-400 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-sky-500/20">
             <BookOpen className="w-5 h-5 fill-current" />
           </div>
           <div>
             <span className="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
-              Reader <span className="text-emerald-400 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">LMS</span>
+              Reader <span className="text-sky-400 text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">LMS</span>
             </span>
             <p className="text-[11px] text-slate-400">Interactive MDX & Audio Narration</p>
           </div>
         </div>
 
-        {/* User Status / Login */}
-        <div className="flex items-center gap-3">
+        {/* Header Actions */}
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={handleOpenSettings}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
             title="SSO Settings"
           >
-            <SettingsIcon className="w-3.5 h-3.5 text-emerald-400" />
+            <SettingsIcon className="w-3.5 h-3.5 text-sky-400" />
             <span className="hidden sm:inline">Settings</span>
           </button>
 
@@ -213,32 +213,10 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => setIsCreateCourseModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/20 transition-all active:scale-95 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">New Course</span>
-            </button>
-          )}
-
-          {user?.role === 'admin' && (
-            <button
-              type="button"
-              onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
-            >
-              <FolderUp className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Batch Import</span>
-            </button>
-          )}
-
-          {user?.role === 'admin' && (
-            <button
-              type="button"
-              onClick={() => navigate('/editor')}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Lesson</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Course</span>
             </button>
           )}
 
@@ -250,7 +228,7 @@ export default function Dashboard() {
                 </div>
                 <div className="hidden md:block text-left">
                   <div className="font-semibold text-white leading-tight">{user?.username}</div>
-                  <div className="text-[10px] text-emerald-400 capitalize">{user?.role}</div>
+                  <div className="text-[10px] text-sky-400 capitalize">{user?.role}</div>
                 </div>
               </div>
 
@@ -295,7 +273,7 @@ export default function Dashboard() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search courses..."
-              className="w-full bg-slate-900/60 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-900/60 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
             />
           </div>
         </div>
@@ -303,7 +281,7 @@ export default function Dashboard() {
         {/* Courses Grid */}
         {isLoading ? (
           <div className="py-20 flex flex-col items-center justify-center text-slate-400 gap-3">
-            <div className="w-9 h-9 rounded-full border-3 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+            <div className="w-9 h-9 rounded-full border-3 border-sky-500/20 border-t-sky-500 animate-spin" />
             <span className="text-xs font-medium">Loading Course Library...</span>
           </div>
         ) : filteredCourses.length === 0 ? (
@@ -311,25 +289,17 @@ export default function Dashboard() {
             <BookOpen className="w-12 h-12 text-slate-600 mx-auto mb-3" />
             <h3 className="text-base font-bold text-white mb-1">No Courses Found</h3>
             <p className="text-xs text-slate-400 mb-6 max-w-md mx-auto">
-              Get started by importing markdown courses using our Batch Importer or create lessons in the WYSIWYG editor.
+              Get started by creating a course, then upload Markdown files or write lessons.
             </p>
             {user?.role === 'admin' && (
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={() => setIsCreateCourseModalOpen(true)}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/20 cursor-pointer flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Create New Course</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsImportModalOpen(true)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700/60 cursor-pointer flex items-center gap-2"
-                >
-                  <FolderUp className="w-4 h-4 text-emerald-400" />
-                  <span>Batch Import ZIP</span>
                 </button>
               </div>
             )}
@@ -349,7 +319,7 @@ export default function Dashboard() {
                 >
                   <div>
                     <div className="flex items-center justify-between mb-4">
-                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 group-hover:scale-105 transition-transform">
                         <BookOpen className="w-5 h-5" />
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -361,7 +331,7 @@ export default function Dashboard() {
                             type="button"
                             onClick={() => setManageCourseId(c.id)}
                             title="Manage Course & Upload .md"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-800 transition-colors cursor-pointer"
                           >
                             <FolderUp className="w-3.5 h-3.5" />
                           </button>
@@ -371,12 +341,12 @@ export default function Dashboard() {
 
                     <h3
                       onClick={() => navigate(`/courses/${c.slug || c.id}`)}
-                      className="font-bold text-base text-white mb-2 group-hover:text-emerald-300 transition-colors cursor-pointer"
+                      className="font-bold text-base text-white mb-2 group-hover:text-sky-300 transition-colors cursor-pointer"
                     >
                       {c.title}
                     </h3>
                     <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-6">
-                      {c.description || 'Interactive markdown course with TTS audio.'}
+                      {c.description || 'Interactive markdown course with audio narration.'}
                     </p>
                   </div>
 
@@ -389,7 +359,7 @@ export default function Dashboard() {
                       </div>
                       <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
+                          className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 rounded-full transition-all duration-500"
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>
@@ -399,7 +369,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => navigate(`/courses/${c.slug || c.id}`)}
-                        className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-sky-600 hover:text-white text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
                         <span>Dashboard</span>
@@ -411,7 +381,7 @@ export default function Dashboard() {
                           type="button"
                           onClick={() => setManageCourseId(c.id)}
                           title="Manage Course & Upload Markdown Files"
-                          className="px-3 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-emerald-400 border border-slate-700/60 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                          className="px-3 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-400 border border-slate-700/60 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
                         >
                           <FolderUp className="w-3.5 h-3.5" />
                           <span className="hidden sm:inline">Manage</span>
@@ -439,7 +409,7 @@ export default function Dashboard() {
             </button>
 
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
                 <FolderUp className="w-5 h-5" />
               </div>
               <div>
@@ -453,7 +423,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setImportMode('zip')}
-                className={`flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${importMode === 'zip' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'}`}
+                className={`flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${importMode === 'zip' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'}`}
               >
                 <Upload className="w-3.5 h-3.5" />
                 Upload ZIP Archive
@@ -461,7 +431,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setImportMode('folder')}
-                className={`flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${importMode === 'folder' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'}`}
+                className={`flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${importMode === 'folder' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'}`}
               >
                 <Folder className="w-3.5 h-3.5" />
                 Server Folder Path
@@ -469,7 +439,7 @@ export default function Dashboard() {
             </div>
 
             {importMsg && (
-              <div className={`p-3.5 rounded-xl text-xs font-semibold mb-5 ${importMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'}`}>
+              <div className={`p-3.5 rounded-xl text-xs font-semibold mb-5 ${importMsg.type === 'success' ? 'bg-sky-500/10 text-sky-300 border border-sky-500/20' : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'}`}>
                 {importMsg.text}
               </div>
             )}
@@ -484,7 +454,7 @@ export default function Dashboard() {
                   value={importCourseTitle}
                   onChange={(e) => setImportCourseTitle(e.target.value)}
                   placeholder="e.g. JSST Speaking Mastery"
-                  className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
                 />
               </div>
 
@@ -497,7 +467,7 @@ export default function Dashboard() {
                     type="file"
                     accept=".zip"
                     onChange={(e) => setZipFile(e.target.files?.[0] || null)}
-                    className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-2.5 text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500"
+                    className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-2.5 text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-500"
                   />
                   <p className="text-[11px] text-slate-500 mt-1.5">
                     Zip should contain folders (chapters) with .md files or direct .md files.
@@ -513,7 +483,7 @@ export default function Dashboard() {
                     value={folderPath}
                     onChange={(e) => setFolderPath(e.target.value)}
                     placeholder="e.g. c:\Users\thanh\OneDrive\CodeHub\Ecosystem\JSST"
-                    className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono"
                   />
                   <p className="text-[11px] text-slate-500 mt-1.5">
                     Enter the absolute folder path containing markdown files.
@@ -524,7 +494,7 @@ export default function Dashboard() {
               <button
                 type="submit"
                 disabled={isImporting}
-                className="w-full mt-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                className="w-full mt-2 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
               >
                 {isImporting ? 'Processing & Importing...' : 'Start Batch Import'}
               </button>
@@ -539,7 +509,7 @@ export default function Dashboard() {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400">
                   <Globe className="w-5 h-5" />
                 </div>
                 <div>
@@ -572,7 +542,7 @@ export default function Dashboard() {
                   type="checkbox"
                   checked={ssoEnabled}
                   onChange={(e) => setSsoEnabled(e.target.checked)}
-                  className="w-5 h-5 text-emerald-500 bg-slate-800 border-slate-700 rounded focus:ring-emerald-500 cursor-pointer"
+                  className="w-5 h-5 text-sky-500 bg-slate-800 border-slate-700 rounded focus:ring-sky-500 cursor-pointer"
                 />
               </div>
 
@@ -585,7 +555,7 @@ export default function Dashboard() {
                   value={ssoUrl}
                   onChange={(e) => setSsoUrl(e.target.value)}
                   placeholder="https://inmind.site"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
                   required
                 />
               </div>
@@ -600,7 +570,7 @@ export default function Dashboard() {
                     value={ssoClientId}
                     onChange={(e) => setSsoClientId(e.target.value)}
                     placeholder="reader-v1"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
                     required
                   />
                 </div>
@@ -613,7 +583,7 @@ export default function Dashboard() {
                     value={ssoClientSecret}
                     onChange={(e) => setSsoClientSecret(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
                     required
                   />
                 </div>
@@ -624,7 +594,7 @@ export default function Dashboard() {
                 <div
                   className={`p-3 rounded-xl text-xs font-medium ${
                     ssoTestStatus.status === 'success'
-                      ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300'
+                      ? 'bg-sky-500/10 border border-sky-500/20 text-sky-300'
                       : ssoTestStatus.status === 'error'
                       ? 'bg-rose-500/10 border border-rose-500/20 text-rose-300'
                       : 'bg-slate-800 text-slate-300'
@@ -648,7 +618,7 @@ export default function Dashboard() {
                 <button
                   type="submit"
                   disabled={isSavingSettings}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/20 transition-all cursor-pointer"
                 >
                   {isSavingSettings ? 'Saving...' : 'Save Changes'}
                 </button>
