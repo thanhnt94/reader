@@ -230,6 +230,7 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
 }
 
 interface BrowserSpeechPlayerProps {
+  lessonId?: number;
   rawMarkdown: string;
   title: string;
   isOpen: boolean;
@@ -240,6 +241,7 @@ interface BrowserSpeechPlayerProps {
 }
 
 export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
+  lessonId,
   rawMarkdown,
   title,
   isOpen,
@@ -348,11 +350,23 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     };
   }, [isPlaying]);
 
+  // Track whether player is actively in continuous autoplay mode
+  const isContinuousPlayingRef = useRef(false);
+
+  // Keep a single reusable Audio element to maintain mobile audio unlocking
+  const getAudioElement = (): HTMLAudioElement => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+    return audioRef.current;
+  };
+
   // Countdown timer effect for auto-advancing to next lesson
   useEffect(() => {
     if (transitionCountdown === null) return;
     if (transitionCountdown <= 0) {
       setTransitionCountdown(null);
+      isContinuousPlayingRef.current = true;
       if (onLessonCompleteRef.current) {
         onLessonCompleteRef.current();
       }
@@ -375,15 +389,12 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     if (synthRef.current) {
       try {
         synthRef.current.cancel();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.onended = null;
       audioRef.current.onerror = null;
-      audioRef.current = null;
     }
     releaseWakeLock();
   };
@@ -407,20 +418,6 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     };
   }, []);
 
-  // Parse markdown into clean speech sentences
-  useEffect(() => {
-    if (rawMarkdown) {
-      const parsed = cleanTextForSpeech(rawMarkdown);
-      setSentences(parsed);
-      setCurrentIndex(0);
-      setIsPlaying(false);
-      setIsPaused(false);
-      setTransitionCountdown(null);
-      stopAllAudio();
-      hasAutoPlayedRef.current = false;
-    }
-  }, [rawMarkdown]);
-
   // Filter sentences according to selected filter mode
   const activeSentences = sentences.filter((s) => {
     if (filterMode === 'ja') return s.lang === 'ja-JP';
@@ -428,20 +425,46 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     return true;
   });
 
-  // Handle autoplay when navigated with ?autoplay=1 (Continuous Audio Machine)
+  // Parse markdown into clean speech sentences and trigger autoplay if continuous mode is active
   useEffect(() => {
-    if (autoPlay && activeSentences.length > 0 && !hasAutoPlayedRef.current) {
-      hasAutoPlayedRef.current = true;
+    if (!rawMarkdown) return;
+
+    const parsed = cleanTextForSpeech(rawMarkdown);
+    setSentences(parsed);
+    setCurrentIndex(0);
+    setTransitionCountdown(null);
+
+    const shouldContinuousPlay =
+      autoPlay || isContinuousPlayingRef.current || (settings.tts_auto_advance && isPlaying);
+
+    if (shouldContinuousPlay && parsed.length > 0) {
+      setIsPlaying(true);
+      setIsPaused(false);
+      isContinuousPlayingRef.current = true;
+
+      // Filter list based on active filterMode
+      const list =
+        filterMode === 'ja'
+          ? parsed.filter((s) => s.lang === 'ja-JP')
+          : filterMode === 'vi'
+          ? parsed.filter((s) => s.lang === 'vi-VN')
+          : parsed;
+
+      // Start sentence 0 of new lesson immediately on persistent unlocked audio element
       const timer = setTimeout(() => {
-        speakSentence(0);
-      }, 400);
+        speakSentence(0, list);
+      }, 100);
       return () => clearTimeout(timer);
+    } else {
+      setIsPlaying(false);
+      setIsPaused(false);
+      stopAllAudio();
     }
-  }, [autoPlay, activeSentences]);
+  }, [rawMarkdown, lessonId]);
 
   const currentSentence = activeSentences[currentIndex] || null;
 
-  // Find best matching voice for language
+  // Find best matching voice for language (used for local speech fallback)
   const getVoiceForLang = (lang: DetectedLang): SpeechSynthesisVoice | null => {
     const langPrefix = lang.split('-')[0].toLowerCase();
 
@@ -472,30 +495,42 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     return null;
   };
 
-  // Speak sentence at specific index
-  const speakSentence = (index: number) => {
-    if (index < 0 || index >= activeSentences.length) {
+  // Speak sentence at specific index (accepts optional sentences list for immediate playback)
+  const speakSentence = (index: number, sentencesOverride?: SpeechSentence[]) => {
+    const list = sentencesOverride || activeSentences;
+    if (index < 0 || index >= list.length) {
       setIsPlaying(false);
       setIsPaused(false);
       return;
     }
 
-    stopAllAudio();
+    // Cancel synthesis if speaking
+    if (synthRef.current) {
+      try { synthRef.current.cancel(); } catch (e) {}
+    }
 
-    const target = activeSentences[index];
+    setCurrentIndex(index);
+    setIsPlaying(true);
+    setIsPaused(false);
+
+    const target = list[index];
     const matchedVoice = getVoiceForLang(target.lang);
 
     const handleSentenceFinish = () => {
-      if (index + 1 < activeSentences.length) {
+      if (index + 1 < list.length) {
         setCurrentIndex(index + 1);
-        speakSentence(index + 1);
+        speakSentence(index + 1, list);
       } else {
-        // Reached end of current lesson
-        if (settingsRef.current.tts_auto_advance && hasNextLessonRef.current && onLessonCompleteRef.current) {
-          setIsPlaying(false);
-          setIsPaused(false);
-          setTransitionCountdown(2);
+        // Reached end of current lesson: auto advance if continuous mode or auto_advance setting is on
+        if (
+          (settingsRef.current.tts_auto_advance || isContinuousPlayingRef.current) &&
+          hasNextLessonRef.current &&
+          onLessonCompleteRef.current
+        ) {
+          isContinuousPlayingRef.current = true;
+          setTransitionCountdown(1);
         } else {
+          isContinuousPlayingRef.current = false;
           setIsPlaying(false);
           setIsPaused(false);
           setCurrentIndex(0);
@@ -503,62 +538,72 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
       }
     };
 
-    // CRITICAL: If language is Vietnamese ('vi-VN') and NO Vietnamese voice is found on the client device:
-    // DO NOT allow the browser's default English voice to read Vietnamese text!
-    // Instead, stream authentic Vietnamese audio from /api/v1/tts/stream!
-    if ((target.lang === 'vi-VN' && !matchedVoice) || (target.lang === 'ja-JP' && !matchedVoice)) {
-      const langParam = target.lang === 'vi-VN' ? 'vi' : 'ja';
-      const streamUrl = `/api/v1/tts/stream?text=${encodeURIComponent(target.text)}&lang=${langParam}`;
-      const audio = new Audio(streamUrl);
-      audio.playbackRate = speed;
-      audioRef.current = audio;
-
-      audio.onended = handleSentenceFinish;
-
-      audio.onerror = (e) => {
-        console.warn('Audio stream error:', e);
-        setIsPlaying(false);
-        setIsPaused(false);
-      };
-
-      setIsPlaying(true);
-      setIsPaused(false);
-      audio.play().catch((err) => {
-        console.warn('Audio play error:', err);
-        setIsPlaying(false);
-        setIsPaused(false);
-      });
-      return;
+    // Preload next sentence audio in background for instant playback
+    if (index + 1 < list.length) {
+      const nextTarget = list[index + 1];
+      const nextLangParam = nextTarget.lang === 'vi-VN' ? 'vi' : (nextTarget.lang === 'ja-JP' ? 'ja' : 'en');
+      const nextUrl = `/api/v1/tts/stream?text=${encodeURIComponent(nextTarget.text)}&lang=${nextLangParam}`;
+      const preloader = new Audio();
+      preloader.preload = 'auto';
+      preloader.src = nextUrl;
     }
 
-    if (!synthRef.current) return;
-
-    const utterance = new SpeechSynthesisUtterance(target.text);
-    utterance.lang = target.lang;
-    utterance.rate = speed;
-
-    if (matchedVoice) {
-      utterance.voice = matchedVoice;
-    }
-
-    utterance.onend = handleSentenceFinish;
-
-    utterance.onerror = (e) => {
-      console.warn('SpeechSynthesis error:', e);
+    // Transparent fallback to local speech synthesis if network stream fails
+    const fallbackToSpeechSynthesis = () => {
+      if (synthRef.current) {
+        try {
+          const utt = new SpeechSynthesisUtterance(target.text);
+          utt.lang = target.lang;
+          utt.rate = speed;
+          if (matchedVoice) utt.voice = matchedVoice;
+          utt.onend = handleSentenceFinish;
+          utt.onerror = () => {
+            console.warn('Speech synthesis error on fallback');
+            setIsPlaying(false);
+            setIsPaused(false);
+          };
+          synthRef.current.speak(utt);
+          return;
+        } catch (e2) {}
+      }
       setIsPlaying(false);
       setIsPaused(false);
     };
 
-    setIsPlaying(true);
-    setIsPaused(false);
-    synthRef.current.speak(utterance);
+    // Unified streaming via backend Google TTS:
+    // Keeps single HTMLAudioElement continuously playing across sentences and lessons,
+    // avoiding mobile browser autoplay blocks and voice mismatch bugs!
+    const langParam = target.lang === 'vi-VN' ? 'vi' : (target.lang === 'ja-JP' ? 'ja' : 'en');
+    const streamUrl = `/api/v1/tts/stream?text=${encodeURIComponent(target.text)}&lang=${langParam}`;
+    const audio = getAudioElement();
+    audio.pause();
+    audio.currentTime = 0;
+    audio.src = streamUrl;
+    audio.playbackRate = speed;
+    audio.onended = handleSentenceFinish;
+
+    audio.onerror = (e) => {
+      console.warn('Audio stream error, falling back to speech synthesis:', e);
+      fallbackToSpeechSynthesis();
+    };
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn('Audio play error, attempting speech synthesis fallback:', err);
+        fallbackToSpeechSynthesis();
+      });
+    }
   };
 
   const handlePlay = () => {
+    isContinuousPlayingRef.current = true;
     setTransitionCountdown(null);
     if (isPaused) {
-      if (audioRef.current) {
-        audioRef.current.play();
+      if (audioRef.current && audioRef.current.src) {
+        audioRef.current.play().catch(() => {
+          speakSentence(currentIndex);
+        });
         setIsPaused(false);
         setIsPlaying(true);
         return;
@@ -574,6 +619,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handlePause = () => {
+    isContinuousPlayingRef.current = false;
     setTransitionCountdown(null);
     if (audioRef.current) {
       audioRef.current.pause();
@@ -586,6 +632,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handleStop = () => {
+    isContinuousPlayingRef.current = false;
     stopAllAudio();
     setIsPlaying(false);
     setIsPaused(false);

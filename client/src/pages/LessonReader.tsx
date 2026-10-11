@@ -203,7 +203,7 @@ export default function LessonReader() {
     nextLesson || (nextChapter?.lessons && nextChapter.lessons.length > 0)
   );
 
-  if (isLoading) {
+  if (isLoading && !lesson) {
     return (
       <div className="min-h-screen bg-[#070a13] flex items-center justify-center text-slate-400">
         <div className="flex flex-col items-center gap-3">
@@ -234,7 +234,12 @@ export default function LessonReader() {
   const isCompleted = lesson.progress?.is_completed;
 
   return (
-    <div className="min-h-screen bg-[#070a13] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#070a13] text-slate-100 flex flex-col font-sans relative">
+      {/* Seamless Transition Loading Indicator */}
+      {isLoading && (
+        <div className="fixed top-0 inset-x-0 h-1 bg-gradient-to-r from-sky-500 via-cyan-400 to-sky-500 z-50 animate-pulse shadow-md shadow-sky-500/30" />
+      )}
+
       {/* Top Navbar */}
       <header className="sticky top-0 z-30 h-14 bg-slate-900/90 border-b border-slate-800 backdrop-blur-xl px-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -651,6 +656,7 @@ export default function LessonReader() {
 
       {/* Browser Native Speech Player */}
       <BrowserSpeechPlayer
+        lessonId={lesson.id}
         rawMarkdown={lesson.raw_markdown || ''}
         title={lesson.title}
         isOpen={isSpeechPlayerOpen}
