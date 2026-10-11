@@ -76,12 +76,20 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
   text = text.replace(/```[\s\S]*?```/g, '');
   text = text.replace(/`[^`]+`/g, '');
 
-  // 3. Remove Japanese Ruby Furigana annotations (<rt>...</rt> and <rp>...</rp>)
+  // 3. Remove nospeech tags (Content that should only be viewed by eyes, never read by audio TTS)
+  text = text.replace(/<nospeech[^>]*>[\s\S]*?<\/nospeech>/gi, '');
+  text = text.replace(/<!--\s*nospeech[\s\S]*?\/nospeech\s*-->/gi, '');
+
+  // 4. In structured Q&A / Role-play lessons:
+  // Automatically strip the dense PREP outline tables & Vocabulary alternative lists at the bottom!
+  text = text.replace(/^#{1,4}\s*[⚡💡📌]?\s*(?:[Dd]àn\s*ý|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý|[Vv]ocabulary)[\s\S]*$/mi, '');
+
+  // 5. Remove Japanese Ruby Furigana annotations (<rt>...</rt> and <rp>...</rp>)
   // Stripping Furigana prevents duplicate pronunciation of both Kanji and Kana
   text = text.replace(/<rt[^>]*>[\s\S]*?<\/rt>/gi, '');
   text = text.replace(/<rp[^>]*>[\s\S]*?<\/rp>/gi, '');
 
-  // 4. Extract explicit language tags if user used <ja>...</ja> or <vi>...</vi>
+  // 6. Extract explicit language tags if user used <ja>...</ja> or <vi>...</vi>
   // We'll preserve them by marker replacement or processing
   const lines = text.split('\n');
   const sentences: SpeechSentence[] = [];
@@ -108,6 +116,15 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
   for (let line of lines) {
     line = line.trim();
     if (!line) continue;
+
+    // Skip generic label-only subheadings so the audio reads seamlessly:
+    // (Question JP -> Question VI translation -> Answer JP -> Answer VI translation)
+    const normalizedLine = line.replace(/[*_#`~>💬📌⚡💡➡/]/g, '').trim();
+    if (
+      /^(?:câu\s*trả\s*lời\s*mẫu|bài\s*nói\s*mẫu|tiếng\s*nhật|dịch\s*nghĩa|dàn\s*ý|từ\s*vựng)\s*:?$/i.test(normalizedLine)
+    ) {
+      continue;
+    }
 
     // Check if line is a Markdown Table row: e.g. | Bước | Tiếng Việt | Tiếng Nhật |
     if (line.startsWith('|') && line.endsWith('|')) {

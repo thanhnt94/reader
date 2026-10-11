@@ -75,6 +75,15 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             );
           },
 
+          // Nospeech block (displayed for reading eyes, skipped by TTS audio)
+          nospeech({ children, ...props }: any) {
+            return (
+              <div className="nospeech-block" {...props}>
+                {children}
+              </div>
+            );
+          },
+
           // Paragraphs
           p({ children, ...props }: any) {
             return (
