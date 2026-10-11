@@ -163,3 +163,154 @@ rt {
   border: 1px solid #1e293b;
   color: #cbd5e1;
 }
+
+/* ==========================================================================
+   Comprehensive Markdown Typography System (.prose & .prose-invert)
+   Ensures rich, readable, high-contrast layouts across all devices
+   ========================================================================== */
+.prose {
+  color: #e2e8f0;
+  max-width: 100%;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.prose h1 {
+  font-size: 1.85rem;
+  line-height: 1.25;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+.prose h2 {
+  font-size: 1.45rem;
+  line-height: 1.3;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+  color: #38bdf8;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+.prose h3 {
+  font-size: 1.2rem;
+  line-height: 1.4;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #f1f5f9;
+}
+
+.prose h4 {
+  font-size: 1.05rem;
+  line-height: 1.45;
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+  color: #94a3b8;
+}
+
+.prose p {
+  margin-top: 0.85rem;
+  margin-bottom: 0.85rem;
+  line-height: 1.75;
+  color: #cbd5e1;
+}
+
+.prose strong, .prose b {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.prose em, .prose i {
+  color: #7dd3fc;
+  font-style: italic;
+}
+
+.prose ul {
+  list-style-type: disc;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.prose li {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+  line-height: 1.65;
+  color: #cbd5e1;
+}
+
+.prose hr {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  border: 0;
+  border-top: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.prose blockquote {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 1rem;
+  border-left: 3px solid #0284c7;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-style: italic;
+  color: #94a3b8;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.prose th {
+  background: rgba(30, 41, 59, 0.7);
+  color: #f1f5f9;
+  font-weight: 600;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  text-align: left;
+}
+
+.prose td {
+  padding: 0.55rem 0.85rem;
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  color: #cbd5e1;
+}
+
+.prose code {
+  background: rgba(30, 41, 59, 0.7);
+  color: #38bdf8;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.prose a {
+  color: #38bdf8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(56, 189, 248, 0.4);
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.prose a:hover {
+  color: #7dd3fc;
+  text-decoration-color: #38bdf8;
+}
+

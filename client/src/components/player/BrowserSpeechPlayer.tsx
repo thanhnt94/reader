@@ -34,7 +34,7 @@ export interface SpeechSentence {
  */
 export function detectLanguage(text: string): DetectedLang {
   const trimmed = text.trim();
-  if (!trimmed) return 'en-US';
+  if (!trimmed) return 'vi-VN';
 
   // 1. Japanese Kanji, Hiragana, Katakana check
   const jaMatches = trimmed.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g);
@@ -46,8 +46,8 @@ export function detectLanguage(text: string): DetectedLang {
   );
   const viCount = viMatches ? viMatches.length : 0;
 
-  // 3. Common Vietnamese unaccented words or labels (like "Cau", "Dich", "Buoc", "Bai")
-  const hasViKeywords = /\b(câu|bài|bước|dịch|nghĩa|tiếng|ví dụ|hỏi|đáp|trả lời|dàn ý|từ vựng)\b/i.test(trimmed);
+  // 3. Common Vietnamese unaccented words or labels (like "Cau", "Dich", "Buoc", "Bai", "Mau", "Cu phap")
+  const hasViKeywords = /\b(câu|bài|bước|dịch|nghĩa|tiếng|ví dụ|hỏi|đáp|trả lời|dàn ý|từ vựng|mẫu|cú pháp|ngữ cảnh|tiến độ|trạng thái|thời gian|công việc|cộng|động từ|thể|tập|nhật|việt|nói|nghe|đọc|viết)\b/i.test(trimmed);
 
   if (jaCount > 0 && jaCount >= viCount && !hasViKeywords) {
     return 'ja-JP';
@@ -58,7 +58,15 @@ export function detectLanguage(text: string): DetectedLang {
   if (jaCount > 0) {
     return 'ja-JP';
   }
-  return 'en-US';
+
+  // Explicit English vocabulary check
+  const isExplicitEnglish = /\b(the|is|are|was|were|have|has|this|that|with|for|and|you|we|they|from|to|in|on|at|lesson|chapter)\b/i.test(trimmed);
+  if (isExplicitEnglish) {
+    return 'en-US';
+  }
+
+  // Default to Vietnamese in InMind Reader platform
+  return 'vi-VN';
 }
 
 /**
@@ -98,13 +106,21 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
   let idx = 0;
 
   const pushSentence = (str: string, forcedLang?: DetectedLang) => {
-    const cleaned = str
+    let cleaned = str
       .replace(/<[^>]+>/g, '') // remove remaining HTML tags
       .replace(/[*_~]{1,3}/g, '') // remove bold/italics
       .replace(/[📌⚡💡💬➡/]/g, ' ') // decorative symbols
       .replace(/^(?:[Cc]âu\s*\d+|[Dd]ịch\s*câu\s*hỏi|[Dd]ịch\s*tình\s*huống|[Tt]ình\s*huống|[Dd]ịch\s*nghĩa|[Tt]iếng\s*[Nn]hật|[Tt]iếng\s*[Vv]iệt|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý)[\s:*_.-]*/i, '')
       .replace(/\s+/g, ' ')
       .trim();
+
+    // Convert plus signs to "cộng" so it reads naturally in Vietnamese, never in English "plus"
+    cleaned = cleaned.replace(/[+＋]/g, ' cộng ').replace(/\s+/g, ' ').trim();
+
+    // Skip isolated bullets, Roman numerals (I, II, III...), plus signs, or single letters
+    if (/^(?:[IVXLCDM]+\.?|\d+\.?|[+＋*•·–—\-#\s]+|[a-zA-Z]\.?)$/i.test(cleaned)) {
+      return;
+    }
 
     if (cleaned.length > 0 && !/^[-_—\s,.:;|]+$/.test(cleaned)) {
       const lang = forcedLang || detectLanguage(cleaned);
@@ -161,8 +177,14 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
     // Clean markdown headings, blockquotes, list markers
     line = line.replace(/^#{1,6}\s+/, '');
     line = line.replace(/^>\s*/, '');
-    line = line.replace(/^\s*[-*+]\s+/, '');
+    line = line.replace(/^\s*[-*+＋•]\s+/, '');
     line = line.replace(/^\s*\d+\.\s+/, '');
+
+    // Clean Roman numerals at start of lines (e.g. "I. TIẾN ĐỘ..." -> "TIẾN ĐỘ...")
+    line = line.replace(/^[IVXLCDM]+\.\s*/i, '');
+
+    // Replace inline plus signs with "cộng"
+    line = line.replace(/[+＋]/g, ' cộng ');
 
     // Clean emojis & decorative symbols from beginning of line (e.g. 📌, 💬, ⚡, 💡)
     line = line.replace(/^[📌⚡💡💬👉➡■●★\s]+/u, '');
@@ -209,11 +231,11 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
       continue;
     }
 
-    // General sentence splitting without regex lookbehinds (for older iOS/WebKit engines)
-    const punctuationSplit = line.split(/([。！？.!?]+)/);
+    // Split sentences on Japanese punctuation ([。！？]) or Western sentence boundaries ([.!?]+ followed by space or end)
+    const punctuationSplit = line.split(/([。！？]+|[.!?]+(?:\s+|$))/);
     let buffer = '';
     for (const part of punctuationSplit) {
-      if (/^[。！？.!?]+$/.test(part)) {
+      if (/^[。！？.!?\s]+$/.test(part)) {
         buffer += part;
         if (buffer.trim()) {
           pushSentence(buffer.trim());

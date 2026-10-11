@@ -103,6 +103,11 @@ Tránh tuyệt đối việc ghi các nhãn cố định vào đầu câu:
 - ❌ **Không viết**: `Dịch câu hỏi: Bạn hãy...`
 - ✅ **Chỉ viết câu văn trực tiếp**.
 
+### 3.3. Đối với công thức ngữ pháp & Số La Mã
+- **Số La Mã đầu mục (I., II., III...)**: Hệ thống Reader tự động lược bỏ khi phát âm thanh để không bị đọc thành tiếng Anh ("eye"), đồng thời vẫn giữ nguyên trên giao diện cho mắt nhìn.
+- **Công thức ngữ pháp có dấu cộng (`+` hoặc `＋`)**: Ví dụ `Động từ thể た ＋ ところです`, hệ thống sẽ tự động phát âm thành *"cộng"* bằng tiếng Việt một cách tự nhiên.
+
+
 ---
 
 ## 4. Phần 3: Phiên âm Furigana chuẩn W3C `<ruby>`

@@ -48,12 +48,108 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     return match && match[2].length === 11 ? match[2] : null;
   };
 
+  // Strip YAML frontmatter from markdown body so it never leaks onto the UI!
+  const cleanContent = React.useMemo(() => {
+    if (!content) return '';
+    return content.replace(/^---[\s\S]*?---\s*\n?/m, '').trim();
+  }, [content]);
+
   return (
     <div className={`prose prose-invert max-w-none text-slate-200 ${sizeClasses} ${spacingClasses}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug]}
         components={{
+          // Headings with prominent typography & anchor support
+          h1({ children, ...props }: any) {
+            return (
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-8 mb-4 tracking-tight border-b border-slate-800 pb-3" {...props}>
+                {children}
+              </h1>
+            );
+          },
+          h2({ children, ...props }: any) {
+            return (
+              <h2 className="text-xl sm:text-2xl font-bold text-sky-400 mt-8 mb-3 tracking-tight border-b border-slate-800/60 pb-2" {...props}>
+                {children}
+              </h2>
+            );
+          },
+          h3({ children, ...props }: any) {
+            return (
+              <h3 className="text-lg sm:text-xl font-bold text-slate-100 mt-6 mb-2 tracking-tight" {...props}>
+                {children}
+              </h3>
+            );
+          },
+          h4({ children, ...props }: any) {
+            return (
+              <h4 className="text-base sm:text-lg font-semibold text-slate-200 mt-4 mb-1.5" {...props}>
+                {children}
+              </h4>
+            );
+          },
+
+          // Horizontal rule
+          hr({ ...props }: any) {
+            return <hr className="my-8 border-t border-slate-800/80" {...props} />;
+          },
+
+          // Lists with styled markers and spacing
+          ul({ children, ...props }: any) {
+            return (
+              <ul className="my-3.5 ml-6 list-disc list-outside space-y-1.5 text-slate-300 marker:text-sky-400" {...props}>
+                {children}
+              </ul>
+            );
+          },
+          ol({ children, ...props }: any) {
+            return (
+              <ol className="my-3.5 ml-6 list-decimal list-outside space-y-1.5 text-slate-300 marker:text-sky-400 font-medium" {...props}>
+                {children}
+              </ol>
+            );
+          },
+          li({ children, ...props }: any) {
+            return (
+              <li className="leading-relaxed pl-1" {...props}>
+                {children}
+              </li>
+            );
+          },
+
+          // Inline emphasis & typography
+          strong({ children, ...props }: any) {
+            return (
+              <strong className="font-bold text-white" {...props}>
+                {children}
+              </strong>
+            );
+          },
+          em({ children, ...props }: any) {
+            return (
+              <em className="italic text-sky-300/90 font-medium" {...props}>
+                {children}
+              </em>
+            );
+          },
+
+          // Japanese Ruby Furigana annotations
+          ruby({ children, ...props }: any) {
+            return (
+              <ruby className="inline-block px-0.5 mx-0.5 text-white" style={{ rubyPosition: 'over' }} {...props}>
+                {children}
+              </ruby>
+            );
+          },
+          rt({ children, ...props }: any) {
+            return (
+              <rt className="text-[0.62em] text-sky-400 select-none font-semibold tracking-tight" {...props}>
+                {children}
+              </rt>
+            );
+          },
+
           // Code & Mermaid Blocks
           code({ className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
@@ -214,7 +310,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           quiz: (props: any) => <QuizBlock {...props} />,
         } as any}
       >
-        {content}
+        {cleanContent}
       </ReactMarkdown>
     </div>
   );
