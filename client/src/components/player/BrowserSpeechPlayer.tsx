@@ -179,17 +179,13 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
       continue;
     }
 
-    // Check for mixed prefixes like:
-    // "Câu 04: 家族と一緒に住んでいますか..."
-    // "Dịch câu hỏi: Bạn thích mùa nào..."
-    // "Tiếng Nhật: 四季の中で..."
+    // Check for prefixes to strip from audio (e.g. "Câu 04:", "Dịch câu hỏi:", "Tình huống:")
+    // Per user request: DO NOT speak "Câu 03", "Dịch câu hỏi", speak question text and translation directly!
     const prefixMatch = line.match(
-      /^((?:[Cc]âu\s*\d+|[Dd]ịch\s*câu\s*hỏi|[Dd]ịch\s*nghĩa|[Tt]iếng\s*[Nn]hật|[Tt]iếng\s*[Vv]iệt|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý)[\s:.-]*)(.*)$/i
+      /^((?:[Cc]âu\s*\d+|[Dd]ịch\s*câu\s*hỏi|[Dd]ịch\s*tình\s*huống|[Tt]ình\s*huống|[Dd]ịch\s*nghĩa|[Tt]iếng\s*[Nn]hật|[Tt]iếng\s*[Vv]iệt|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý)[\s:.-]*)(.*)$/i
     );
     if (prefixMatch) {
-      const prefix = prefixMatch[1].trim();
       const rest = prefixMatch[2].trim();
-      if (prefix) pushSentence(prefix, 'vi-VN');
       if (rest) {
         // Split rest if it contains punctuation
         const subParts = rest.split(/([。！？.!?]+)/);
