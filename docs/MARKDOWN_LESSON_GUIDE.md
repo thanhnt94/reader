@@ -1,85 +1,87 @@
-# 📘 Quy Chuẩn Soạn Thảo File Bài Học Markdown (.md) Cho InMind Reader
+# 📘 Hướng Dẫn Soạn Thảo File Bài Học Markdown (.md) Đơn Lẻ
 
-> **Tài liệu hướng dẫn chuẩn hóa cấu trúc nội dung, siêu dữ liệu (frontmatter), bảng biểu, furigana và tối ưu hóa âm thanh (Audio / TTS Continuous Playback) cho hệ thống InMind Reader.**
+> **Quy chuẩn kỹ thuật soạn thảo 1 file `.md` đơn lẻ cho hệ thống InMind Reader, tối ưu hóa 100% cho giao diện đọc và bộ máy phát âm thanh tự động (Bilingual Audio / Continuous TTS).**
 
 ---
 
 ## 📑 Mục lục
-1. [Cấu trúc thư mục & Khóa học (Folder Structure)](#1-cấu-trúc-thư-mục--khóa-học)
-2. [Cấu trúc file Markdown chuẩn (.md Anatomy)](#2-cấu-trúc-file-markdown-chuẩn)
-3. [Quy chuẩn âm thanh & TTS Song ngữ (Audio & TTS Engine)](#3-quy-chuẩn-âm-thanh--tts-song-ngữ)
-4. [Cú pháp Furigana (Chữ Hán có phiên âm)](#4-cú-pháp-furigana)
-5. [Ẩn nội dung khỏi Audio với `<nospeech>`](#5-ẩn-nội-dung-khỏi-audio-với-nospeech)
-6. [Bảng biểu, Ghi chú & Định dạng MDX](#6-bảng-biểu-ghi-chú--định-dạng-mdx)
-7. [File mẫu chuẩn hoàn chỉnh (Full Working Template)](#7-file-mẫu-chuẩn-hoàn-chỉnh)
-8. [Checklist kiểm tra trước khi Import](#8-checklist-kiểm-tra-trước-khi-import)
+1. [Cấu trúc tổng quan của 1 file .md](#1-cấu-trúc-tổng-quan-của-1-file-md)
+2. [Phần 1: YAML Frontmatter (Siêu dữ liệu đầu file)](#2-phần-1-yaml-frontmatter-siêu-dữ-liệu-đầu-file)
+3. [Phần 2: Thân bài học & Quy chuẩn Audio TTS](#3-phần-2-thân-bài-học--quy-chuẩn-audio-tts)
+4. [Phần 3: Phiên âm Furigana chuẩn W3C `<ruby>`](#4-phần-3-phiên-âm-furigana-chuẩn-w3c-ruby)
+5. [Phần 4: Ẩn nội dung khỏi Audio bằng `<nospeech>`](#5-phần-4-ẩn-nội-dung-khỏi-audio-bằng-nospeech)
+6. [Phần 5: Đánh dấu ngôn ngữ khi câu pha trộn (`<ja>`, `<vi>`)](#6-phần-5-đánh-dấu-ngôn-ngữ-khi-câu-pha-trộn-ja-vi)
+7. [File mẫu chuẩn hoàn chỉnh (Copy & Dùng ngay)](#7-file-mẫu-chuẩn-hoàn-chỉnh-copy--dùng-ngay)
+8. [Checklist kiểm tra 1 file .md trước khi lưu](#8-checklist-kiểm-tra-1-file-md-trước-khi-lưu)
 
 ---
 
-## 1. Cấu trúc thư mục & Khóa học
+## 1. Cấu trúc tổng quan của 1 file .md
 
-Hệ thống InMind Reader hỗ trợ cơ chế **Batch Import** (qua file `.zip` hoặc đường dẫn thư mục). Hệ thống sẽ tự động phân cấp thành **Khóa học (Course) ➔ Chương (Chapter) ➔ Bài học (Lesson)** dựa trên cấu trúc thư mục:
+Mỗi file `.md` bài học là một thực thể độc lập, gồm 2 phần rõ rệt:
 
-```text
-📁 Tên_Khóa_Học/                  (Cấp 1: Tên Khóa học - ví dụ: JSST)
-│
-├── 📁 01. Xin phép & Nghỉ phép/  (Cấp 2: Tên Chương 1 - đánh số 01, 02 để xếp thứ tự)
-│   ├── 01. Đau bụng xin nghỉ.md  (Cấp 3: File bài học 1)
-│   ├── 02. Xin đi muộn.md        (Cấp 3: File bài học 2)
-│   └── 03. Xin về sớm.md
-│
-├── 📁 02. Báo cáo & Trao đổi/    (Cấp 2: Tên Chương 2)
-│   ├── 01. Báo cáo tiến độ.md
-│   └── 02. Xin ý kiến sếp.md
-│
-└── 📁 03. Nhờ vả & Từ chối/
-    └── 01. Nhờ đồng nghiệp giúp.md
+```markdown
+---
+# PHẦN 1: YAML FRONTMATTER (Thông tin bài học)
+title: "Tiêu đề bài học"
+order: 1
+tts: true
+---
+
+# PHẦN 2: THÂN BÀI HỌC (Nội dung hiển thị & Nội dung đọc Audio)
+
+## 📌 Tình huống / Câu hỏi
+[Câu tiếng Nhật]
+*[Dịch tiếng Việt in nghiêng]*
+
+## 💬 Bài nói mẫu / Nội dung bài
+[Câu tiếng Nhật 1]
+*[Dịch tiếng Việt câu 1]*
+
+[Câu tiếng Nhật 2]
+*[Dịch tiếng Việt câu 2]*
+
+<nospeech>
+## 💡 Dàn ý & Ghi chú (Chỉ mắt xem, không đọc audio)
+...
+</nospeech>
 ```
 
-> [!TIP]
-> **Đánh số thứ tự**: Hãy luôn đặt tiền tố số thứ tự cho thư mục và file (ví dụ `01. `, `02. `, `03. `) để hệ thống tự động sắp xếp danh mục và bài học theo đúng lộ trình mong muốn.
-
 ---
 
-## 2. Cấu trúc file Markdown chuẩn
+## 2. Phần 1: YAML Frontmatter (Siêu dữ liệu đầu file)
 
-Mỗi file `.md` nên bao gồm 2 phần chính:
-1. **YAML Frontmatter** (nằm ở đầu file, kẹp giữa cặp `---`).
-2. **Nội dung Markdown** (thân bài học).
-
-### 2.1. YAML Frontmatter (Siêu dữ liệu)
+Nằm ở **dòng đầu tiên** của file, kẹp giữa hai dấu `---`:
 
 ```yaml
 ---
-title: "勤務時間中の外部研修参加の許可を取る"
+title: "06. 勤務時間中の外部研修参加の許可を取る"
 order: 6
 tts: true
-audio_url: ""
-duration: 0
 tags:
   - "Xin phép"
-  - "Công sở"
   - "N3-N2"
 ---
 ```
 
+### Các trường hỗ trợ:
 | Trường | Bắt buộc | Mặc định | Ý nghĩa |
 | :--- | :---: | :---: | :--- |
-| `title` | Không | Lấy tên file hoặc H1 | Tiêu đề bài học hiển thị trên trang và mục lục |
-| `order` | Không | Tự động tăng | Thứ tự bài học trong chương |
-| `tts` | Không | `true` | Bật/tắt tính năng đọc TTS cho bài học này |
-| `audio_url` | Không | `null` | Đường dẫn file MP3 thu âm sẵn (nếu có audio người thật đọc) |
-| `duration` | Không | `0` | Thời lượng audio tính bằng giây (nếu có `audio_url`) |
-| `tags` | Không | `[]` | Danh sách nhãn phân loại bài học |
+| `title` | Không | Lấy dòng `# ` đầu tiên | Tiêu đề hiển thị của bài học trên thanh tiêu đề và danh sách bài. |
+| `order` | Không | 1 | Số thứ tự sắp xếp của bài học. |
+| `tts` | Không | `true` | Bật/tắt tính năng đọc âm thanh TTS cho bài học. |
+| `audio_url` | Không | `""` | Đường dẫn file MP3 thu âm sẵn (nếu bài học có sẵn file audio người thật đọc). |
+| `duration` | Không | `0` | Thời lượng file MP3 tính bằng giây (nếu dùng `audio_url`). |
+| `tags` | Không | `[]` | Các nhãn phân loại chủ đề (ví dụ: `["Xin phép", "Kinh doanh"]`). |
 
 ---
 
-## 3. Quy chuẩn âm thanh & TTS Song ngữ
+## 3. Phần 2: Thân bài học & Quy chuẩn Audio TTS
 
-Hệ thống InMind Reader được trang bị **Engine TTS Song ngữ thông minh (Bilingual Smart Engine)**. Để âm thanh đọc mượt mà, tự nhiên và tự động chuyển câu/chuyển bài không lỗi, hãy tuân thủ các quy tắc sau:
+Để bộ máy TTS phát âm chuẩn xác từng câu và tự động chuyển câu/chuyển bài mượt mà:
 
-### 3.1. Cấu trúc Song ngữ Xen kẽ (Sentence-by-Sentence Interleaving)
-Trình phát TTS sẽ đọc từng câu theo thứ tự: **1 câu tiếng Nhật ➔ 1 câu dịch tiếng Việt tương ứng**.
+### 3.1. Cấu trúc cặp câu song ngữ xen kẽ (Bắt buộc)
+Trình phát sẽ đọc theo thứ tự: **1 câu tiếng Nhật ➔ Dừng nghỉ ➔ 1 câu dịch tiếng Việt tương ứng ➔ Dừng nghỉ ➔ Câu tiếp theo...**
 
 ```markdown
 休みの日は、いつもより少し遅く起きて、家で猫と遊んで過ごします。
@@ -89,93 +91,78 @@ Trình phát TTS sẽ đọc từng câu theo thứ tự: **1 câu tiếng Nhậ
 *Mèo của tôi rất đáng yêu, chỉ cần ở bên cạnh nó thôi là bao căng thẳng mỗi ngày đều tan biến.*
 ```
 
-- **Quy ước**:
-  - Dòng trên: **Câu tiếng Nhật gốc**.
-  - Dòng dưới ngay sau: **Dịch tiếng Việt** (khuyến khích viết *in nghiêng* `*...*` để phân biệt trực quan về mặt thị giác).
-  - Cách 1 dòng trống trước khi sang cặp câu tiếp theo.
-- **Cách hoạt động của Audio**:
-  - Máy đọc câu Nhật ➔ Tạm dừng $x$ giây (theo cài đặt *Nghỉ câu*) ➔ Đọc câu dịch Việt ➔ Tạm dừng $x$ giây ➔ Đọc câu Nhật tiếp theo...
-  - Người học có thể shadowing (nhại theo) và nắm trọn nghĩa của từng câu mà không cần phải nhìn xuống cuối bài.
+- **Dòng trên**: Câu tiếng Nhật.
+- **Dòng dưới ngay sau**: Dịch tiếng Việt (khuyến khích viết *in nghiêng* bằng cặp `*...*` để phân biệt thị giác rõ ràng).
+- **Cách 1 dòng trống**: Phân cách rõ ràng giữa các cặp câu.
 
-### 3.2. Không ghi các nhãn phụ (Prefixes) trong câu đọc
-Tránh viết các nhãn như:
-- ❌ `Câu 01: 休みの日は...` (TTS sẽ đọc cả chữ "Câu không một")
-- ❌ `Dịch nghĩa: Vào ngày nghỉ...`
-- ❌ `Tiếng Nhật: 休みの日は...`
-- ❌ `📌 Câu hỏi:`
-- ✅ **Chỉ viết câu văn trực tiếp**:
-  ```markdown
-  休みの日は、いつもより少し遅く起きて、家で猫と遊んで過ごします。
-  *Vào ngày nghỉ, tôi dậy muộn hơn bình thường một chút, và dành thời gian ở nhà chơi với mèo.*
-  ```
+### 3.2. Không viết các tiền tố (Prefixes) rác vào đầu câu
+Tránh tuyệt đối việc ghi các nhãn cố định vào đầu câu:
+- ❌ **Không viết**: `Câu 01: 休みの日は...` (Máy sẽ đọc cả chữ "Câu không một").
+- ❌ **Không viết**: `Dịch nghĩa: Vào ngày nghỉ...`
+- ❌ **Không viết**: `Tiếng Nhật: 休みの日は...`
+- ❌ **Không viết**: `Dịch câu hỏi: Bạn hãy...`
+- ✅ **Chỉ viết câu văn trực tiếp**.
 
 ---
 
-## 4. Cú pháp Furigana (Chữ Hán có phiên âm)
+## 4. Phần 3: Phiên âm Furigana chuẩn W3C `<ruby>`
 
-Hệ thống hỗ trợ thẻ HTML `<ruby>` chuẩn W3C để hiển thị phiên âm Hiragana trên đầu chữ Hán:
+Hệ thống hỗ trợ thẻ HTML `<ruby>` chuẩn:
 
 ```html
-<ruby>研修<rt>けんしゅう</rt></ruby>に<ruby>参加<rt>さんか</rt></ruby>したいと<ruby>思<rt>おも</rt></ruby>っております。
+実は、来週の金曜日に<ruby>外部研修<rt>がいぶけんしゅう</rt></ruby>が<ruby>開催<rt>かいさい</rt></ruby>されます。
 ```
 
-- **Màn hình hiển thị**:
-  Chữ Hán hiển thị to, phiên âm Hiragana nhỏ xinh nằm ngay ngắn phía trên đầu chữ Hán.
-- **Xử lý Audio thông minh**:
-  Trình phát TTS **tự động bóc tách** thẻ `<rt>...</rt>` và `<rp>...</rp>`. Máy chỉ đọc chữ Hán chính, **tuyệt đối không bị lỗi đọc lặp** cả Kanji lẫn Kana.
+- **Màn hình hiển thị**: Chữ Hán to, chữ Furigana nhỏ xíu nằm ngay ngắn trên đầu chữ Hán.
+- **Xử lý Audio thông minh**: Engine TTS sẽ tự động lọc bỏ thẻ `<rt>` và `<rp>` khi đọc. Máy chỉ đọc chữ Hán chính, **tuyệt đối không bị đọc lặp** cả Kanji lẫn Kana.
 
 ---
 
-## 5. Ẩn nội dung khỏi Audio với `<nospeech>`
+## 5. Phần 4: Ẩn nội dung khỏi Audio bằng `<nospeech>`
 
-Trong một bài học, có những phần **chỉ dành cho mắt xem** (như bảng dàn ý PREP, phân tích ngữ pháp, bảng so sánh từ vựng thay thế) mà **không muốn audio đọc ê a từng chữ**.
+Trong bài học thường có các phần **chỉ dành cho mắt xem** (như dàn ý phân tích, bảng PREP, từ vựng mở rộng, ngữ pháp ghi chú). Nếu để nguyên, audio sẽ đọc ê a từng ô trong bảng rất khó chịu.
 
-Hãy bao bọc đoạn đó trong thẻ `<nospeech>...</nospeech>`:
+Hãy bao bọc toàn bộ phần đó bên trong thẻ `<nospeech>...</nospeech>`:
 
 ```html
 <nospeech>
 
-### 💡 Dàn ý trả lời (PREP)
-| Bước | Ý chính | Câu gợi ý |
+## 💡 Dàn ý trả lời (PREP)
+
+| Bước | Ý chính | Gợi ý tiếng Nhật |
 | :--- | :--- | :--- |
-| **Point** | Xin phép tham gia | 外部研修への参加許可をいただきたく... |
-| **Reason** | Lý do cần học | 業務効率化に直結するスキルのため... |
+| **Point** | Xin phép | 外部研修への参加許可をいただきたく... |
+| **Reason** | Lý do | 業務効率化に直結するため... |
+
+## 📚 Từ vựng mở rộng
+- <ruby>外部研修<rt>がいぶけんしゅう</rt></ruby>: Đào tạo bên ngoài
+- <ruby>業務効率化<rt>ぎょうむこうりつか</rt></ruby>: Nâng cao hiệu suất công việc
 
 </nospeech>
 ```
 
-- **Trên giao diện**: Người dùng vẫn nhìn thấy bảng biểu, dàn ý, icon bình thường.
-- **Trên Audio TTS**: Trình phát sẽ tự động lướt qua đoạn này, không đọc vào tai người nghe.
-
-> [!NOTE]
-> Ngoài ra, các tiêu đề H2/H3 như `## Dàn ý`, `## Từ vựng`, `## Ghi chú` nằm ở cuối bài cũng được Engine tự động nhận diện và bỏ qua khi đọc.
+- **Giao diện bài học**: Vẫn hiển thị đầy đủ bảng biểu, màu sắc, icon.
+- **Trình phát Audio TTS**: Sẽ bỏ qua toàn bộ phần này, chỉ tập trung đọc Tình huống và Bài nói mẫu.
 
 ---
 
-## 6. Bảng biểu, Ghi chú & Định dạng MDX
+## 6. Phần 5: Đánh dấu ngôn ngữ khi câu pha trộn (`<ja>`, `<vi>`)
 
-### 6.1. Tiêu đề phân cấp (H1, H2, H3)
-- `# Tiêu đề bài học` (Chỉ dùng 1 lần ở đầu bài).
-- `## Phần lớn` (Ví dụ: `## Tình huống`, `## Câu trả lời mẫu`).
-- `### Mục con` (Ví dụ: `### Cách nói trang trọng`, `### Cách nói ngắn gọn`).
-- Hệ thống tự động trích xuất các tiêu đề `##` và `###` thành **Table of Contents (Mục lục cuộn)** bên thanh điều hướng.
-
-### 6.2. Hộp lưu ý / Callout Box
-Sử dụng cú pháp blockquote Markdown để tạo các khung ghi chú đẹp mắt:
+Trong trường hợp có 1 dòng chứa cả tiếng Nhật và tiếng Việt lẫn lộn (ví dụ mục giải thích từ vựng hoặc so sánh ngữ pháp), hãy dùng thẻ `<ja>` và `<vi>` để ép giọng đọc chính xác cho từng phần:
 
 ```markdown
-> [!TIP]
-> Khi xin phép cấp trên, hãy luôn trình bày trước lý do và lợi ích đối với công ty (lợi ích kép) thay vì chỉ nói nguyện vọng cá nhân.
-
-> [!WARNING]
-> Không được tự ý đăng ký khóa học trước khi có sự đồng ý chính thức của cấp trên quản lý trực tiếp.
+<ja>四季</ja>: <vi>bốn mùa</vi>
+<ja>前倒しにする</ja>: <vi>làm trước thời hạn, đẩy sớm tiến độ</vi>
 ```
+
+- Máy sẽ đọc đoạn `<ja>` bằng giọng tiếng Nhật chuẩn Tokyo.
+- Máy sẽ đọc đoạn `<vi>` bằng giọng tiếng Việt chuẩn.
 
 ---
 
-## 7. File mẫu chuẩn hoàn chỉnh (Full Working Template)
+## 7. File mẫu chuẩn hoàn chỉnh (Copy & Dùng ngay)
 
-Dưới đây là một file mẫu hoàn chỉnh đạt 100% chuẩn kỹ thuật để anh có thể sao chép và chỉnh sửa nội dung:
+Dưới đây là một file `.md` đơn lẻ hoàn chỉnh 100% chuẩn kỹ thuật để anh có thể copy làm mẫu:
 
 ```markdown
 ---
@@ -184,7 +171,7 @@ order: 6
 tts: true
 tags:
   - "Xin phép"
-  - "Nghỉ phép"
+  - "N3-N2"
   - "Role Play"
 ---
 
@@ -238,13 +225,11 @@ tags:
 
 ---
 
-## 8. Checklist kiểm tra trước khi Import
+## 8. Checklist kiểm tra 1 file .md trước khi lưu
 
-Trước khi nén thư mục thành `.zip` hoặc import vào InMind Reader, hãy kiểm tra nhanh:
-
-- [ ] **Mã hóa file**: File được lưu với encoding **UTF-8** (không dùng UTF-16, Shift-JIS).
-- [ ] **Định dạng cặp câu**: Câu tiếng Nhật ở trên, dòng dịch nghĩa tiếng Việt ở ngay dưới (in nghiêng).
-- [ ] **Không sót Prefix rác**: Không viết `Câu 01:`, `Dịch:`, `Tiếng Nhật:` ở đầu câu.
-- [ ] **Thẻ `<nospeech>`**: Các bảng biểu dài, dàn ý, từ vựng phụ đã được kẹp trong `<nospeech>...</nospeech>`.
-- [ ] **Thẻ `<ruby>` hợp lệ**: Các thẻ phiên âm đóng mở đúng cú pháp `<ruby>漢字<rt>かんじ</rt></ruby>`.
-- [ ] **Tên file & thư mục**: Có tiền tố số thứ tự rõ ràng (`01. `, `02. `).
+- [ ] **Mã hóa file**: Lưu dưới dạng **UTF-8** (không có BOM).
+- [ ] **Frontmatter**: Có cặp `---` ở đầu với ít nhất trường `title`.
+- [ ] **Cặp câu xen kẽ**: Câu Nhật ở trên, dòng dịch Việt ở ngay dưới (*in nghiêng*).
+- [ ] **Sạch Prefix**: Không có chữ `Câu 01:`, `Dịch nghĩa:`, `Tiếng Nhật:` ở đầu câu.
+- [ ] **Furigana đúng thẻ**: Dùng thẻ `<ruby>漢字<rt>かんじ</rt></ruby>`.
+- [ ] **Đã bọc `<nospeech>`**: Các bảng biểu, dàn ý PREP, từ vựng phụ đã được kẹp trong `<nospeech>...</nospeech>`.
