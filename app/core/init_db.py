@@ -24,6 +24,14 @@ async def init_db():
             await conn.exec_driver_sql("ALTER TABLE user_global_settings ADD COLUMN tts_auto_advance BOOLEAN DEFAULT 0")
         except Exception:
             pass
+        try:
+            await conn.exec_driver_sql("ALTER TABLE user_global_settings ADD COLUMN tts_sentence_delay FLOAT DEFAULT 0.5")
+        except Exception:
+            pass
+        try:
+            await conn.exec_driver_sql("ALTER TABLE user_global_settings ADD COLUMN tts_lesson_delay INTEGER DEFAULT 2")
+        except Exception:
+            pass
 
     async with SessionLocal() as db:
         # 1. Initialize SSO Settings

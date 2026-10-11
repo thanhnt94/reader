@@ -25,6 +25,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   auto_scroll: true,
   tts_wake_lock: true,
   tts_auto_advance: false,
+  tts_sentence_delay: 0.5,
+  tts_lesson_delay: 2,
 };
 
 export const useAppStore = create<AppState>((set, get) => ({

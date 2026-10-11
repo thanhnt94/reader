@@ -15,7 +15,9 @@ import {
   Maximize2,
   Sun,
   Radio,
-  FastForward
+  FastForward,
+  Timer,
+  Clock
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -268,6 +270,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   // Continuous Mode Countdown State & Refs
   const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
   const countdownTimerRef = useRef<any>(null);
+  const sentenceDelayTimerRef = useRef<any>(null);
   const onLessonCompleteRef = useRef(onLessonComplete);
   const hasNextLessonRef = useRef(hasNextLesson);
   const settingsRef = useRef(settings);
@@ -384,6 +387,10 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   const stopAllAudio = () => {
     if (countdownTimerRef.current) {
       clearTimeout(countdownTimerRef.current);
+    }
+    if (sentenceDelayTimerRef.current) {
+      clearTimeout(sentenceDelayTimerRef.current);
+      sentenceDelayTimerRef.current = null;
     }
     setTransitionCountdown(null);
     if (synthRef.current) {
@@ -518,8 +525,19 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
     const handleSentenceFinish = () => {
       if (index + 1 < list.length) {
-        setCurrentIndex(index + 1);
-        speakSentence(index + 1, list);
+        const sentenceDelaySec = settingsRef.current.tts_sentence_delay ?? 0.5;
+        const delayMs = Math.max(0, Math.round(sentenceDelaySec * 1000));
+
+        if (delayMs > 0) {
+          if (sentenceDelayTimerRef.current) clearTimeout(sentenceDelayTimerRef.current);
+          sentenceDelayTimerRef.current = setTimeout(() => {
+            setCurrentIndex(index + 1);
+            speakSentence(index + 1, list);
+          }, delayMs);
+        } else {
+          setCurrentIndex(index + 1);
+          speakSentence(index + 1, list);
+        }
       } else {
         // Reached end of current lesson: auto advance if continuous mode or auto_advance setting is on
         if (
@@ -528,7 +546,8 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
           onLessonCompleteRef.current
         ) {
           isContinuousPlayingRef.current = true;
-          setTransitionCountdown(1);
+          const lessonDelaySec = settingsRef.current.tts_lesson_delay ?? 2;
+          setTransitionCountdown(Math.max(1, lessonDelaySec));
         } else {
           isContinuousPlayingRef.current = false;
           setIsPlaying(false);
@@ -599,6 +618,10 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   const handlePlay = () => {
     isContinuousPlayingRef.current = true;
     setTransitionCountdown(null);
+    if (sentenceDelayTimerRef.current) {
+      clearTimeout(sentenceDelayTimerRef.current);
+      sentenceDelayTimerRef.current = null;
+    }
     if (isPaused) {
       if (audioRef.current && audioRef.current.src) {
         audioRef.current.play().catch(() => {
@@ -621,6 +644,10 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   const handlePause = () => {
     isContinuousPlayingRef.current = false;
     setTransitionCountdown(null);
+    if (sentenceDelayTimerRef.current) {
+      clearTimeout(sentenceDelayTimerRef.current);
+      sentenceDelayTimerRef.current = null;
+    }
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -640,6 +667,10 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handlePrev = () => {
+    if (sentenceDelayTimerRef.current) {
+      clearTimeout(sentenceDelayTimerRef.current);
+      sentenceDelayTimerRef.current = null;
+    }
     const nextIdx = Math.max(0, currentIndex - 1);
     setCurrentIndex(nextIdx);
     if (isPlaying) {
@@ -648,6 +679,10 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handleNext = () => {
+    if (sentenceDelayTimerRef.current) {
+      clearTimeout(sentenceDelayTimerRef.current);
+      sentenceDelayTimerRef.current = null;
+    }
     const nextIdx = Math.min(activeSentences.length - 1, currentIndex + 1);
     setCurrentIndex(nextIdx);
     if (isPlaying) {
@@ -981,6 +1016,76 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
           <div className="text-[10px] text-slate-400 font-mono hidden sm:inline">
             {hasNextLesson ? '● Có bài kế tiếp' : '■ Đã đến bài cuối'}
+          </div>
+        </div>
+
+        {/* Timing & Delay Controls (Sentence Interval & Next Lesson Countdown) */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-1.5 px-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 text-[11px]">
+          {/* Sentence Delay (Nghỉ giữa các câu) */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="flex items-center gap-1 text-slate-300 font-medium shrink-0">
+              <Timer className="w-3.5 h-3.5 text-sky-400" />
+              <span>Nghỉ câu:</span>
+            </span>
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-950/80 p-0.5 rounded-lg border border-slate-800">
+              {[
+                { val: 0, label: '0s' },
+                { val: 0.5, label: '0.5s' },
+                { val: 1, label: '1s' },
+                { val: 2, label: '2s' },
+                { val: 3, label: '3s' }
+              ].map((item) => {
+                const isActive = (settings.tts_sentence_delay ?? 0.5) === item.val;
+                return (
+                  <button
+                    key={item.val}
+                    type="button"
+                    onClick={() => updateSettings({ tts_sentence_delay: item.val })}
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-sky-500 text-slate-950 shadow-xs shadow-sky-500/30'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                    title={`Nghỉ ${item.label} trước khi đọc câu tiếp theo`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Next Lesson Delay (Thời gian chờ sang bài tiếp theo) */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="flex items-center gap-1 text-slate-300 font-medium shrink-0">
+              <Clock className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Chờ sang bài:</span>
+            </span>
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-950/80 p-0.5 rounded-lg border border-slate-800">
+              {[
+                { val: 1, label: '1s' },
+                { val: 2, label: '2s' },
+                { val: 3, label: '3s' },
+                { val: 5, label: '5s' }
+              ].map((item) => {
+                const isActive = (settings.tts_lesson_delay ?? 2) === item.val;
+                return (
+                  <button
+                    key={item.val}
+                    type="button"
+                    onClick={() => updateSettings({ tts_lesson_delay: item.val })}
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-cyan-500 text-slate-950 shadow-xs shadow-cyan-500/30'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                    title={`Đếm ngược ${item.label} trước khi tự chuyển sang bài tiếp theo`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

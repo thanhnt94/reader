@@ -13,6 +13,8 @@ class UserGlobalSettings(Base):
     auto_scroll = Column(Boolean, default=True)
     tts_wake_lock = Column(Boolean, default=True)
     tts_auto_advance = Column(Boolean, default=False)
+    tts_sentence_delay = Column(Float, default=0.5)
+    tts_lesson_delay = Column(Integer, default=2)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
@@ -25,5 +27,7 @@ class UserGlobalSettings(Base):
             "auto_scroll": self.auto_scroll,
             "tts_wake_lock": bool(self.tts_wake_lock) if self.tts_wake_lock is not None else True,
             "tts_auto_advance": bool(self.tts_auto_advance) if self.tts_auto_advance is not None else False,
+            "tts_sentence_delay": float(self.tts_sentence_delay) if self.tts_sentence_delay is not None else 0.5,
+            "tts_lesson_delay": int(self.tts_lesson_delay) if self.tts_lesson_delay is not None else 2,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }

@@ -19,6 +19,8 @@ class UpdateSettingsRequest(BaseModel):
     auto_scroll: Optional[bool] = None
     tts_wake_lock: Optional[bool] = None
     tts_auto_advance: Optional[bool] = None
+    tts_sentence_delay: Optional[float] = None
+    tts_lesson_delay: Optional[int] = None
 
 @router.get("")
 async def get_user_settings(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -53,6 +55,10 @@ async def update_user_settings(data: UpdateSettingsRequest, user: User = Depends
         settings_obj.tts_wake_lock = data.tts_wake_lock
     if data.tts_auto_advance is not None:
         settings_obj.tts_auto_advance = data.tts_auto_advance
+    if data.tts_sentence_delay is not None:
+        settings_obj.tts_sentence_delay = data.tts_sentence_delay
+    if data.tts_lesson_delay is not None:
+        settings_obj.tts_lesson_delay = data.tts_lesson_delay
 
     await db.commit()
     await db.refresh(settings_obj)

@@ -78,6 +78,8 @@ export interface UserSettings {
   auto_scroll: boolean;
   tts_wake_lock?: boolean;
   tts_auto_advance?: boolean;
+  tts_sentence_delay?: number;
+  tts_lesson_delay?: number;
 }
 
 export interface LessonComment {
