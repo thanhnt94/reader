@@ -51,7 +51,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   // Strip YAML frontmatter from markdown body and ensure Vietnamese translations break to a new line!
   const cleanContent = React.useMemo(() => {
     if (!content) return '';
-    let text = content.replace(/^---[\s\S]*?---\s*\n?/m, '').trim();
+    let text = content.replace(/^\s*---[\r\n]+[\s\S]*?[\r\n]+---\s*[\r\n]*/, '').trim();
 
     // Ensure translations or consecutive lines under Japanese/dialogue break into a new paragraph (Enter xuống 1 dòng):
     // 1. Line followed immediately by italic translation (*...*)

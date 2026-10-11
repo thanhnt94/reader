@@ -81,7 +81,7 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
   let text = rawMarkdown;
 
   // 1. Remove YAML frontmatter
-  text = text.replace(/^---[\s\S]*?---\s*\n?/m, '');
+  text = text.replace(/^\s*---[\r\n]+[\s\S]*?[\r\n]+---\s*[\r\n]*/, '');
 
   // 2. Remove code blocks
   text = text.replace(/```[\s\S]*?```/g, '');
