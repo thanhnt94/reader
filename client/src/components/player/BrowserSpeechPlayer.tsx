@@ -100,6 +100,7 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
       .replace(/<[^>]+>/g, '') // remove remaining HTML tags
       .replace(/[*_~]{1,3}/g, '') // remove bold/italics
       .replace(/[📌⚡💡💬➡/]/g, ' ') // decorative symbols
+      .replace(/^(?:[Cc]âu\s*\d+|[Dd]ịch\s*câu\s*hỏi|[Dd]ịch\s*tình\s*huống|[Tt]ình\s*huống|[Dd]ịch\s*nghĩa|[Tt]iếng\s*[Nn]hật|[Tt]iếng\s*[Vv]iệt|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý)[\s:*_.-]*/i, '')
       .replace(/\s+/g, ' ')
       .trim();
 
@@ -161,6 +162,23 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
     line = line.replace(/^\s*[-*+]\s+/, '');
     line = line.replace(/^\s*\d+\.\s+/, '');
 
+    // Clean emojis & decorative symbols from beginning of line (e.g. 📌, 💬, ⚡, 💡)
+    line = line.replace(/^[📌⚡💡💬👉➡■●★\s]+/u, '');
+
+    // Clean leading bold/italic formatting (e.g. **, *)
+    line = line.replace(/^[*_~]{1,3}\s*/, '');
+
+    // Strip audio prefixes completely so they are NEVER spoken:
+    // e.g. "Câu 03:", "Dịch câu hỏi:", "Tình huống:", "Dịch tình huống:", "Tiếng Nhật:", "Dịch nghĩa:"
+    line = line.replace(
+      /^(?:[Cc]âu\s*\d+|[Dd]ịch\s*câu\s*hỏi|[Dd]ịch\s*tình\s*huống|[Tt]ình\s*huống|[Dd]ịch\s*nghĩa|[Tt]iếng\s*[Nn]hật|[Tt]iếng\s*[Vv]iệt|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý)[\s:*_.-]*/i,
+      ''
+    );
+
+    // Clean any residual formatting, colons, or dashes after prefix removal
+    line = line.replace(/^[*_~:\s-]+/, '').trim();
+    if (!line) continue;
+
     // Check for explicit <ja>...</ja> or <vi>...</vi> tags
     if (/<ja>[\s\S]*?<\/ja>/i.test(line) || /<vi>[\s\S]*?<\/vi>/i.test(line)) {
       // Split on tags
@@ -175,31 +193,6 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
         } else {
           pushSentence(seg);
         }
-      }
-      continue;
-    }
-
-    // Check for prefixes to strip from audio (e.g. "Câu 04:", "Dịch câu hỏi:", "Tình huống:")
-    // Per user request: DO NOT speak "Câu 03", "Dịch câu hỏi", speak question text and translation directly!
-    const prefixMatch = line.match(
-      /^((?:[Cc]âu\s*\d+|[Dd]ịch\s*câu\s*hỏi|[Dd]ịch\s*tình\s*huống|[Tt]ình\s*huống|[Dd]ịch\s*nghĩa|[Tt]iếng\s*[Nn]hật|[Tt]iếng\s*[Vv]iệt|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý)[\s:.-]*)(.*)$/i
-    );
-    if (prefixMatch) {
-      const rest = prefixMatch[2].trim();
-      if (rest) {
-        // Split rest if it contains punctuation
-        const subParts = rest.split(/([。！？.!?]+)/);
-        let cur = '';
-        for (const sp of subParts) {
-          if (/^[。！？.!?]+$/.test(sp)) {
-            cur += sp;
-            if (cur.trim()) pushSentence(cur.trim());
-            cur = '';
-          } else {
-            cur += sp;
-          }
-        }
-        if (cur.trim()) pushSentence(cur.trim());
       }
       continue;
     }
