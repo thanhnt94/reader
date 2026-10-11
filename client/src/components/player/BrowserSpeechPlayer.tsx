@@ -12,8 +12,12 @@ import {
   ChevronDown,
   ChevronUp,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Sun,
+  Radio,
+  FastForward
 } from 'lucide-react';
+import { useAppStore } from '../../store/useAppStore';
 
 export type DetectedLang = 'ja-JP' | 'vi-VN' | 'en-US';
 
@@ -224,6 +228,9 @@ interface BrowserSpeechPlayerProps {
   title: string;
   isOpen: boolean;
   onClose: () => void;
+  onLessonComplete?: () => void;
+  hasNextLesson?: boolean;
+  autoPlay?: boolean;
 }
 
 export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
@@ -231,7 +238,12 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   title,
   isOpen,
   onClose,
+  onLessonComplete,
+  hasNextLesson = false,
+  autoPlay = false,
 }) => {
+  const { settings, updateSettings } = useAppStore();
+
   const [sentences, setSentences] = useState<SpeechSentence[]>([]);
   const [filterMode, setFilterMode] = useState<'all' | 'ja' | 'vi'>('all');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -241,11 +253,119 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
+  // Screen Wake Lock API State & Ref
+  const wakeLockRef = useRef<any>(null);
+  const [isWakeLocked, setIsWakeLocked] = useState(false);
+
+  // Continuous Mode Countdown State & Refs
+  const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
+  const countdownTimerRef = useRef<any>(null);
+  const onLessonCompleteRef = useRef(onLessonComplete);
+  const hasNextLessonRef = useRef(hasNextLesson);
+  const settingsRef = useRef(settings);
+  const hasAutoPlayedRef = useRef(false);
+
+  useEffect(() => {
+    onLessonCompleteRef.current = onLessonComplete;
+  }, [onLessonComplete]);
+
+  useEffect(() => {
+    hasNextLessonRef.current = hasNextLesson;
+  }, [hasNextLesson]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Request Screen Wake Lock (Keeps mobile display awake during TTS playback)
+  const requestWakeLock = async () => {
+    if (!settingsRef.current.tts_wake_lock) return;
+    if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+      try {
+        if (wakeLockRef.current) {
+          try {
+            await wakeLockRef.current.release();
+          } catch (e) {
+            // ignore
+          }
+          wakeLockRef.current = null;
+        }
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        setIsWakeLocked(true);
+        wakeLockRef.current?.addEventListener('release', () => {
+          setIsWakeLocked(false);
+          wakeLockRef.current = null;
+        });
+      } catch (err) {
+        console.warn('Wake Lock request error:', err);
+        setIsWakeLocked(false);
+      }
+    }
+  };
+
+  // Release Screen Wake Lock
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch (e) {
+        // ignore
+      }
+      wakeLockRef.current = null;
+      setIsWakeLocked(false);
+    }
+  };
+
+  // Synchronize Wake Lock with playback status
+  useEffect(() => {
+    if (isPlaying && settings.tts_wake_lock) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  }, [isPlaying, settings.tts_wake_lock]);
+
+  // Re-acquire Wake Lock when tab/app becomes visible again if playing
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isPlaying && settingsRef.current.tts_wake_lock) {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [isPlaying]);
+
+  // Countdown timer effect for auto-advancing to next lesson
+  useEffect(() => {
+    if (transitionCountdown === null) return;
+    if (transitionCountdown <= 0) {
+      setTransitionCountdown(null);
+      if (onLessonCompleteRef.current) {
+        onLessonCompleteRef.current();
+      }
+      return;
+    }
+    countdownTimerRef.current = setTimeout(() => {
+      setTransitionCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => {
+      if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+    };
+  }, [transitionCountdown]);
+
   // Stop both speech synthesis and any playing audio stream
   const stopAllAudio = () => {
+    if (countdownTimerRef.current) {
+      clearTimeout(countdownTimerRef.current);
+    }
+    setTransitionCountdown(null);
     if (synthRef.current) {
       try {
         synthRef.current.cancel();
@@ -259,6 +379,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
       audioRef.current.onerror = null;
       audioRef.current = null;
     }
+    releaseWakeLock();
   };
 
   // Initialize SpeechSynthesis and load browser voices
@@ -288,7 +409,9 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
       setCurrentIndex(0);
       setIsPlaying(false);
       setIsPaused(false);
+      setTransitionCountdown(null);
       stopAllAudio();
+      hasAutoPlayedRef.current = false;
     }
   }, [rawMarkdown]);
 
@@ -298,6 +421,17 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     if (filterMode === 'vi') return s.lang === 'vi-VN';
     return true;
   });
+
+  // Handle autoplay when navigated with ?autoplay=1 (Continuous Audio Machine)
+  useEffect(() => {
+    if (autoPlay && activeSentences.length > 0 && !hasAutoPlayedRef.current) {
+      hasAutoPlayedRef.current = true;
+      const timer = setTimeout(() => {
+        speakSentence(0);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [autoPlay, activeSentences]);
 
   const currentSentence = activeSentences[currentIndex] || null;
 
@@ -345,6 +479,24 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     const target = activeSentences[index];
     const matchedVoice = getVoiceForLang(target.lang);
 
+    const handleSentenceFinish = () => {
+      if (index + 1 < activeSentences.length) {
+        setCurrentIndex(index + 1);
+        speakSentence(index + 1);
+      } else {
+        // Reached end of current lesson
+        if (settingsRef.current.tts_auto_advance && hasNextLessonRef.current && onLessonCompleteRef.current) {
+          setIsPlaying(false);
+          setIsPaused(false);
+          setTransitionCountdown(2);
+        } else {
+          setIsPlaying(false);
+          setIsPaused(false);
+          setCurrentIndex(0);
+        }
+      }
+    };
+
     // CRITICAL: If language is Vietnamese ('vi-VN') and NO Vietnamese voice is found on the client device:
     // DO NOT allow the browser's default English voice to read Vietnamese text!
     // Instead, stream authentic Vietnamese audio from /api/v1/tts/stream!
@@ -355,16 +507,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
       audio.playbackRate = speed;
       audioRef.current = audio;
 
-      audio.onended = () => {
-        if (index + 1 < activeSentences.length) {
-          setCurrentIndex(index + 1);
-          speakSentence(index + 1);
-        } else {
-          setIsPlaying(false);
-          setIsPaused(false);
-          setCurrentIndex(0);
-        }
-      };
+      audio.onended = handleSentenceFinish;
 
       audio.onerror = (e) => {
         console.warn('Audio stream error:', e);
@@ -392,16 +535,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
       utterance.voice = matchedVoice;
     }
 
-    utterance.onend = () => {
-      if (index + 1 < activeSentences.length) {
-        setCurrentIndex(index + 1);
-        speakSentence(index + 1);
-      } else {
-        setIsPlaying(false);
-        setIsPaused(false);
-        setCurrentIndex(0);
-      }
-    };
+    utterance.onend = handleSentenceFinish;
 
     utterance.onerror = (e) => {
       console.warn('SpeechSynthesis error:', e);
@@ -415,6 +549,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handlePlay = () => {
+    setTransitionCountdown(null);
     if (isPaused) {
       if (audioRef.current) {
         audioRef.current.play();
@@ -433,6 +568,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handlePause = () => {
+    setTransitionCountdown(null);
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -480,56 +616,94 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     return (
       <div className="fixed bottom-[70px] inset-x-3 sm:bottom-4 sm:inset-x-auto sm:right-6 max-w-sm ml-auto z-50 animate-in slide-in-from-bottom duration-200 font-sans">
         <div className="bg-slate-900/95 border border-sky-500/40 rounded-2xl p-2 px-3 shadow-2xl backdrop-blur-xl text-slate-100 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-            <span className="text-xs font-bold text-white truncate max-w-[120px]">
-              #{currentIndex + 1}/{activeSentences.length}
-            </span>
-            <span className="text-[10px] text-sky-400 font-mono">
-              {currentSentence?.lang === 'ja-JP' ? '🇯🇵' : currentSentence?.lang === 'vi-VN' ? '🇻🇳' : '🇺🇸'}
-            </span>
-          </div>
+          {transitionCountdown !== null ? (
+            <>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
+                <span className="text-xs font-bold text-sky-300 truncate">
+                  Tiếp theo ({transitionCountdown}s)...
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTransitionCountdown(null);
+                    if (onLessonCompleteRef.current) onLessonCompleteRef.current();
+                  }}
+                  className="px-2 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-[10px] font-bold cursor-pointer"
+                >
+                  Chuyển ngay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTransitionCountdown(null)}
+                  className="px-1.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px] cursor-pointer"
+                >
+                  Hủy
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                <span className="text-xs font-bold text-white truncate max-w-[100px]">
+                  #{currentIndex + 1}/{activeSentences.length}
+                </span>
+                <span className="text-[10px] text-sky-400 font-mono">
+                  {currentSentence?.lang === 'ja-JP' ? '🇯🇵' : currentSentence?.lang === 'vi-VN' ? '🇻🇳' : '🇺🇸'}
+                </span>
+                {settings.tts_wake_lock && (
+                  <span title="Màn hình sáng" className="text-amber-400 text-[10px]">☀️</span>
+                )}
+                {settings.tts_auto_advance && (
+                  <span title="Chạy liên tục (Máy audio)" className="text-sky-400 text-[10px]">📻</span>
+                )}
+              </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {isPlaying ? (
-              <button
-                type="button"
-                onClick={handlePause}
-                className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold"
-              >
-                <Pause className="w-3.5 h-3.5 fill-current" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handlePlay}
-                className="w-7 h-7 rounded-lg bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold"
-              >
-                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-              </button>
-            )}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isPlaying ? (
+                  <button
+                    type="button"
+                    onClick={handlePause}
+                    className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold"
+                  >
+                    <Pause className="w-3.5 h-3.5 fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handlePlay}
+                    className="w-7 h-7 rounded-lg bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                  </button>
+                )}
 
-            <button
-              type="button"
-              onClick={() => setIsCollapsed(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Mở rộng trình phát"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCollapsed(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  title="Mở rộng trình phát"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                handleStop();
-                onClose();
-              }}
-              className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
-              title="Đóng"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleStop();
+                    onClose();
+                  }}
+                  className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                  title="Đóng"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -625,6 +799,40 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
           </div>
         </div>
 
+        {/* Transition Countdown Banner (Auto-advance to next lesson) */}
+        {transitionCountdown !== null && (
+          <div className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-sky-950/90 via-blue-950/90 to-sky-900/90 border border-sky-500/50 flex items-center justify-between gap-2 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs shrink-0 animate-pulse">
+                {transitionCountdown}s
+              </div>
+              <p className="text-xs text-sky-200 font-medium truncate">
+                Đã đọc xong! Đang chuyển bài tiếp theo...
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setTransitionCountdown(null);
+                  if (onLessonCompleteRef.current) onLessonCompleteRef.current();
+                }}
+                className="px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-sky-500/20"
+              >
+                <FastForward className="w-3 h-3" />
+                <span>Chuyển ngay</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTransitionCountdown(null)}
+                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium cursor-pointer"
+              >
+                Dừng lại
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Live Active Sentence Display */}
         <div className="p-2 sm:p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 min-h-[46px] flex flex-col justify-center">
           {currentSentence ? (
@@ -665,8 +873,66 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
           )}
         </div>
 
+        {/* Smart Modes & Options Bar (Screen Wake Lock & Continuous Audio Machine) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+          <div className="flex items-center gap-2">
+            {/* Screen Wake Lock Toggle */}
+            <button
+              type="button"
+              onClick={() => updateSettings({ tts_wake_lock: !settings.tts_wake_lock })}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all cursor-pointer ${
+                settings.tts_wake_lock
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-xs shadow-amber-500/10'
+                  : 'bg-slate-800/70 text-slate-400 hover:text-white border border-slate-700/50'
+              }`}
+              title={
+                settings.tts_wake_lock
+                  ? 'Màn hình luôn bật sáng khi đọc trên di động'
+                  : 'Tự tắt màn hình theo cài đặt tiết kiệm pin của máy'
+              }
+            >
+              <Sun
+                className={`w-3.5 h-3.5 ${
+                  settings.tts_wake_lock && isPlaying ? 'text-amber-400' : ''
+                }`}
+              />
+              <span>{settings.tts_wake_lock ? 'Giữ màn hình sáng' : 'Tự tắt MH'}</span>
+              {isWakeLocked && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping ml-0.5" />
+              )}
+            </button>
+
+            {/* Continuous Audio Machine Toggle */}
+            <button
+              type="button"
+              onClick={() => updateSettings({ tts_auto_advance: !settings.tts_auto_advance })}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all cursor-pointer ${
+                settings.tts_auto_advance
+                  ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30 shadow-xs shadow-sky-500/20'
+                  : 'bg-slate-800/70 text-slate-400 hover:text-white border border-slate-700/50'
+              }`}
+              title={
+                settings.tts_auto_advance
+                  ? 'Tự động nhảy sang bài/chương tiếp theo khi đọc xong (Máy audio chạy liên tục)'
+                  : 'Chỉ đọc hết bài hiện tại rồi dừng lại'
+              }
+            >
+              <Radio
+                className={`w-3.5 h-3.5 ${
+                  settings.tts_auto_advance ? 'text-sky-400 animate-pulse' : ''
+                }`}
+              />
+              <span>{settings.tts_auto_advance ? 'Máy audio (Chạy liên tục)' : 'Đọc 1 bài'}</span>
+            </button>
+          </div>
+
+          <div className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+            {hasNextLesson ? '● Có bài kế tiếp' : '■ Đã đến bài cuối'}
+          </div>
+        </div>
+
         {/* Playback Controls & Speed */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
           {/* Main Buttons */}
           <div className="flex items-center gap-1.5">
             <button

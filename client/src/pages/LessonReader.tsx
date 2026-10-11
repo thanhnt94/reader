@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Menu,
   X,
@@ -39,6 +39,8 @@ export default function LessonReader() {
     courseId?: string;
   }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const autoPlayFromUrl = searchParams.get('autoplay') === '1';
 
   const { settings, updateSettings, user } = useAppStore();
 
@@ -60,6 +62,13 @@ export default function LessonReader() {
   // Target identifier: either slug or ID
   const targetLookup = lessonSlug || lessonId;
 
+  // Auto-open speech player if arrived with ?autoplay=1 (Continuous Audio Machine)
+  useEffect(() => {
+    if (autoPlayFromUrl) {
+      setIsSpeechPlayerOpen(true);
+    }
+  }, [autoPlayFromUrl, lesson?.id]);
+
   // Load lesson details
   useEffect(() => {
     if (!targetLookup) return;
@@ -78,7 +87,8 @@ export default function LessonReader() {
             document.title = `${les.title} — ${c.title}`;
             // Clean up browser URL if navigated via /reader/:id
             if (window.location.pathname.startsWith('/reader/')) {
-              window.history.replaceState(null, '', `/courses/${c.slug}/${les.slug}`);
+              const search = window.location.search;
+              window.history.replaceState(null, '', `/courses/${c.slug}/${les.slug}${search}`);
             }
           }).catch(console.error);
         } else {
@@ -165,19 +175,33 @@ export default function LessonReader() {
     }
   }
 
-  const navigateToLesson = (target: Lesson) => {
+  const navigateToLesson = (target: Lesson, autoPlay = false) => {
+    const qs = autoPlay ? '?autoplay=1' : '';
     if (course) {
-      navigate(`/courses/${course.slug || course.id}/${target.slug || target.id}`);
+      navigate(`/courses/${course.slug || course.id}/${target.slug || target.id}${qs}`);
     } else {
-      navigate(`/reader/${target.id}`);
+      navigate(`/reader/${target.id}${qs}`);
     }
   };
 
-  const navigateToChapter = (chap: Chapter) => {
+  const navigateToChapter = (chap: Chapter, autoPlay = false) => {
     if (chap.lessons && chap.lessons.length > 0) {
-      navigateToLesson(chap.lessons[0]);
+      navigateToLesson(chap.lessons[0], autoPlay);
     }
   };
+
+  // Continuous Audio Machine: automatically advance to next lesson/chapter when speech finishes
+  const handleLessonTTSComplete = () => {
+    if (nextLesson) {
+      navigateToLesson(nextLesson, true);
+    } else if (nextChapter?.lessons && nextChapter.lessons.length > 0) {
+      navigateToLesson(nextChapter.lessons[0], true);
+    }
+  };
+
+  const hasNextToAdvance = Boolean(
+    nextLesson || (nextChapter?.lessons && nextChapter.lessons.length > 0)
+  );
 
   if (isLoading) {
     return (
@@ -631,6 +655,9 @@ export default function LessonReader() {
         title={lesson.title}
         isOpen={isSpeechPlayerOpen}
         onClose={() => setIsSpeechPlayerOpen(false)}
+        onLessonComplete={handleLessonTTSComplete}
+        hasNextLesson={hasNextToAdvance}
+        autoPlay={autoPlayFromUrl}
       />
 
       {/* Docked Audio Player */}

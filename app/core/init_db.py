@@ -15,6 +15,15 @@ async def init_db():
     logger.info("Initializing Reader Database...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Safely migrate new settings columns for SQLite if table already exists
+        try:
+            await conn.exec_driver_sql("ALTER TABLE user_global_settings ADD COLUMN tts_wake_lock BOOLEAN DEFAULT 1")
+        except Exception:
+            pass
+        try:
+            await conn.exec_driver_sql("ALTER TABLE user_global_settings ADD COLUMN tts_auto_advance BOOLEAN DEFAULT 0")
+        except Exception:
+            pass
 
     async with SessionLocal() as db:
         # 1. Initialize SSO Settings

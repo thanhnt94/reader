@@ -17,6 +17,8 @@ class UpdateSettingsRequest(BaseModel):
     line_spacing: Optional[str] = None
     audio_speed: Optional[float] = None
     auto_scroll: Optional[bool] = None
+    tts_wake_lock: Optional[bool] = None
+    tts_auto_advance: Optional[bool] = None
 
 @router.get("")
 async def get_user_settings(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -47,6 +49,10 @@ async def update_user_settings(data: UpdateSettingsRequest, user: User = Depends
         settings_obj.audio_speed = data.audio_speed
     if data.auto_scroll is not None:
         settings_obj.auto_scroll = data.auto_scroll
+    if data.tts_wake_lock is not None:
+        settings_obj.tts_wake_lock = data.tts_wake_lock
+    if data.tts_auto_advance is not None:
+        settings_obj.tts_auto_advance = data.tts_auto_advance
 
     await db.commit()
     await db.refresh(settings_obj)

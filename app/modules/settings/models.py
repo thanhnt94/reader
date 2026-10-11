@@ -11,6 +11,8 @@ class UserGlobalSettings(Base):
     line_spacing = Column(String(20), default="relaxed")
     audio_speed = Column(Float, default=1.0)
     auto_scroll = Column(Boolean, default=True)
+    tts_wake_lock = Column(Boolean, default=True)
+    tts_auto_advance = Column(Boolean, default=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
@@ -21,5 +23,7 @@ class UserGlobalSettings(Base):
             "line_spacing": self.line_spacing,
             "audio_speed": self.audio_speed,
             "auto_scroll": self.auto_scroll,
+            "tts_wake_lock": bool(self.tts_wake_lock) if self.tts_wake_lock is not None else True,
+            "tts_auto_advance": bool(self.tts_auto_advance) if self.tts_auto_advance is not None else False,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }

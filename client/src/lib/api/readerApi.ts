@@ -76,6 +76,8 @@ export interface UserSettings {
   line_spacing: 'normal' | 'relaxed' | 'loose';
   audio_speed: number;
   auto_scroll: boolean;
+  tts_wake_lock?: boolean;
+  tts_auto_advance?: boolean;
 }
 
 export interface LessonComment {

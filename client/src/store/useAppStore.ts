@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   line_spacing: 'relaxed',
   audio_speed: 1.0,
   auto_scroll: true,
+  tts_wake_lock: true,
+  tts_auto_advance: false,
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
