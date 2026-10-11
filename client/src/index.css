@@ -35,18 +35,26 @@ html, body, #root {
 }
 
 
-/* Japanese Ruby Furigana Enhancements */
+/* Japanese Ruby Furigana Enhancements - Professional Japanese JIS Typesetting */
 ruby {
+  display: inline-ruby;
   ruby-position: over;
-  ruby-align: center;
+  vertical-align: baseline;
+  margin: 0;
+  padding: 0;
 }
 rt {
-  font-size: 0.65em;
+  display: ruby-text;
+  font-size: 0.55em;
+  line-height: 1;
   color: #38bdf8;
   user-select: none;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.02em;
+  margin: 0;
+  padding: 0;
 }
+
 
 /* GitHub Alert Styles */
 .alert-note {

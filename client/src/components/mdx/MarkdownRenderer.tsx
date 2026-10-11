@@ -144,21 +144,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             );
           },
 
-          // Japanese Ruby Furigana annotations
+          // Japanese Ruby Furigana annotations - Professional Japanese JIS Typesetting
           ruby({ children, ...props }: any) {
             return (
-              <ruby className="inline-block px-0.5 mx-0.5 text-white" style={{ rubyPosition: 'over' }} {...props}>
+              <ruby className="text-white" style={{ display: 'inline-ruby', rubyPosition: 'over', verticalAlign: 'baseline', margin: 0, padding: 0 }} {...props}>
                 {children}
               </ruby>
             );
           },
           rt({ children, ...props }: any) {
             return (
-              <rt className="text-[0.62em] text-sky-400 select-none font-semibold tracking-tight" {...props}>
+              <rt className="text-[0.55em] text-sky-400 select-none font-semibold tracking-tight" style={{ display: 'ruby-text', lineHeight: 1, margin: 0, padding: 0 }} {...props}>
                 {children}
               </rt>
             );
           },
+
 
           // Code & Mermaid Blocks
           code({ className, children, ...props }: any) {
