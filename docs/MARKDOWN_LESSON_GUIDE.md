@@ -103,9 +103,11 @@ Tránh tuyệt đối việc ghi các nhãn cố định vào đầu câu:
 - ❌ **Không viết**: `Dịch câu hỏi: Bạn hãy...`
 - ✅ **Chỉ viết câu văn trực tiếp**.
 
-### 3.3. Đối với công thức ngữ pháp & Số La Mã
-- **Số La Mã đầu mục (I., II., III...)**: Hệ thống Reader tự động lược bỏ khi phát âm thanh để không bị đọc thành tiếng Anh ("eye"), đồng thời vẫn giữ nguyên trên giao diện cho mắt nhìn.
-- **Công thức ngữ pháp có dấu cộng (`+` hoặc `＋`)**: Ví dụ `Động từ thể た ＋ ところです`, hệ thống sẽ tự động phát âm thành *"cộng"* bằng tiếng Việt một cách tự nhiên.
+### 3.3. Tự động xuống dòng câu dịch trên giao diện & Xử lý ngữ pháp thông minh
+- **Tự động xuống dòng câu dịch**: Khi viết dòng tiếng Nhật và dòng dịch tiếng Việt liền kề, giao diện InMind Reader sẽ tự động nhận diện và ngắt dòng (Enter xuống 1 dòng) giữa câu Nhật và câu Việt, giúp bố cục thông thoáng, dễ nhìn.
+- **Tiêu đề bài học có "Tập 1, Tập 2"**: Khi đọc Audio, hệ thống tự động loại bỏ hậu tố `- Tập 1`, `- Tập 2` để tên bài ngắn gọn, tập trung.
+- **Tiêu đề nhóm mẫu câu (I., II., Phần 1: ...)**: Hệ thống tự động chuyển đổi thành lời dẫn tự nhiên, ví dụ: *"I. TIẾN ĐỘ, THỜI GIAN..."* ➔ máy đọc là *"Các mẫu câu liên quan đến tiến độ, thời gian..."*.
+- **Công thức ngữ pháp đa ngữ (Cú pháp: Động từ thể た ＋ ところです)**: Hệ thống tách thông minh theo từng phân đoạn ngôn ngữ. Phần tiếng Việt và chữ "cộng" được đọc bằng giọng Việt chuẩn, còn các chữ Kana/Kanji (`た`, `ところです`, `ます`...) được phát âm bằng đúng giọng tiếng Nhật bản ngữ.
 
 
 ---

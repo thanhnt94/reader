@@ -48,11 +48,21 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     return match && match[2].length === 11 ? match[2] : null;
   };
 
-  // Strip YAML frontmatter from markdown body so it never leaks onto the UI!
+  // Strip YAML frontmatter from markdown body and ensure Vietnamese translations break to a new line!
   const cleanContent = React.useMemo(() => {
     if (!content) return '';
-    return content.replace(/^---[\s\S]*?---\s*\n?/m, '').trim();
+    let text = content.replace(/^---[\s\S]*?---\s*\n?/m, '').trim();
+
+    // Ensure translations or consecutive lines under Japanese/dialogue break into a new paragraph (Enter xuống 1 dòng):
+    // 1. Line followed immediately by italic translation (*...*)
+    text = text.replace(/([^\n])\n(\s*\*)/g, '$1\n\n$2');
+
+    // 2. Line with Japanese characters immediately followed by a non-empty text line
+    text = text.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF>][^\n]*)\n([^\n#*|>])/g, '$1\n\n$2');
+
+    return text;
   }, [content]);
+
 
   return (
     <div className={`prose prose-invert max-w-none text-slate-200 ${sizeClasses} ${spacingClasses}`}>

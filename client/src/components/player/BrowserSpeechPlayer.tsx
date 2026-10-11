@@ -27,6 +27,7 @@ export interface SpeechSentence {
   index: number;
   text: string;
   lang: DetectedLang;
+  noDelay?: boolean;
 }
 
 /**
@@ -105,7 +106,7 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
   const sentences: SpeechSentence[] = [];
   let idx = 0;
 
-  const pushSentence = (str: string, forcedLang?: DetectedLang) => {
+  const pushSentence = (str: string, forcedLang?: DetectedLang, noDelay?: boolean) => {
     let cleaned = str
       .replace(/<[^>]+>/g, '') // remove remaining HTML tags
       .replace(/[*_~]{1,3}/g, '') // remove bold/italics
@@ -128,6 +129,7 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
         index: idx++,
         text: cleaned,
         lang,
+        noDelay: !!noDelay,
       });
     }
   };
@@ -174,13 +176,27 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
       continue;
     }
 
+    // Transform grammar section headings:
+    // e.g. "## I. TIẾN ĐỘ, THỜI GIAN VÀ TRẠNG THÁI CÔNG VIỆC" or "Phần 1: TIẾN ĐỘ..."
+    // -> "Các mẫu câu liên quan đến tiến độ, thời gian và trạng thái công việc"
+    const sectionMatch = line.match(
+      /^(?:#{1,4}\s*)?(?:(?:Phần|phần|Chương|chương|Mục|mục)\s*(?:\d+|[IVXLCDM]+)[\s:.-]*|[IVXLCDM]+\.[\s:-]*)\s*(.+)$/i
+    );
+    if (sectionMatch) {
+      const topic = sectionMatch[1].trim();
+      line = `Các mẫu câu liên quan đến ${topic.toLowerCase()}`;
+    }
+
     // Clean markdown headings, blockquotes, list markers
     line = line.replace(/^#{1,6}\s+/, '');
     line = line.replace(/^>\s*/, '');
     line = line.replace(/^\s*[-*+＋•]\s+/, '');
     line = line.replace(/^\s*\d+\.\s+/, '');
 
-    // Clean Roman numerals at start of lines (e.g. "I. TIẾN ĐỘ..." -> "TIẾN ĐỘ...")
+    // Strip "- Tập 1", "- Tập 2" (or "Tập 1", "Tập 2") from lesson titles:
+    line = line.replace(/[\s–—-]+\s*(?:Tập|tập|Phần|phần|Vol|vol|Volume|Part)\s*\d+.*$/i, '');
+
+    // Clean Roman numerals at start of lines (if any residual)
     line = line.replace(/^[IVXLCDM]+\.\s*/i, '');
 
     // Replace inline plus signs with "cộng"
@@ -202,6 +218,33 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
     // Clean any residual formatting, colons, or dashes after prefix removal
     line = line.replace(/^[*_~:\s-]+/, '').trim();
     if (!line) continue;
+
+    // Check if line has mixed Japanese characters AND Vietnamese text (e.g. grammar formulas):
+    // e.g. "Cú pháp: Động từ thể た ＋ ところです" or "Cú pháp: Động từ bỏ ます ＋ 次第、すぐに"
+    const hasJa = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(line);
+    const hasVi = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]/i.test(line);
+    const hasViKw = /\b(cú\s*pháp|động\s*từ|thể|bỏ|từ\s*điển|ngữ\s*cảnh|nghĩa|mẫu|ví\s*dụ|cộng)\b/i.test(line);
+
+    if (hasJa && (hasVi || hasViKw)) {
+      const normalizedMixed = line.replace(/[+＋]/g, ' cộng ').replace(/\s+/g, ' ').trim();
+      const mixedTokens = normalizedMixed.split(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\u3001\u3002\u300C\u300D]+)/);
+      const nonNullTokens = mixedTokens.map((t) => t.trim()).filter(Boolean);
+
+      for (let i = 0; i < nonNullTokens.length; i++) {
+        const tok = nonNullTokens[i];
+        const isJaToken = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(tok);
+        const isNotLast = i < nonNullTokens.length - 1;
+        if (isJaToken) {
+          pushSentence(tok, 'ja-JP', isNotLast);
+        } else {
+          const cleanVi = tok.replace(/^[*_~:\s-]+|[*_~:\s-]+$/g, '').trim();
+          if (cleanVi) {
+            pushSentence(cleanVi, 'vi-VN', isNotLast);
+          }
+        }
+      }
+      continue;
+    }
 
     // Check for explicit <ja>...</ja> or <vi>...</vi> tags
     if (/<ja>[\s\S]*?<\/ja>/i.test(line) || /<vi>[\s\S]*?<\/vi>/i.test(line)) {
@@ -547,7 +590,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
     const handleSentenceFinish = () => {
       if (index + 1 < list.length) {
-        const sentenceDelaySec = settingsRef.current.tts_sentence_delay ?? 0.5;
+        const sentenceDelaySec = target.noDelay ? 0.15 : (settingsRef.current.tts_sentence_delay ?? 0.5);
         const delayMs = Math.max(0, Math.round(sentenceDelaySec * 1000));
 
         if (delayMs > 0) {
