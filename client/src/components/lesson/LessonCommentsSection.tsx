@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   MessageSquare,
   Send,
   Trash2,
   Reply,
-  CornerDownRight,
   User as UserIcon,
   X,
-  Sparkles,
   ShieldCheck,
-  Clock
+  GraduationCap,
+  LogIn,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { readerApi, LessonComment } from '../../lib/api/readerApi';
 import { useAppStore } from '../../store/useAppStore';
@@ -21,19 +23,40 @@ interface LessonCommentsSectionProps {
   isDrawer?: boolean;
 }
 
+function formatRelativeTime(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffSec < 45) return 'Vừa xong';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`;
+    if (diffSec < 172800) {
+      return `Hôm qua lúc ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return date.toLocaleDateString([], { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
 export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
   lessonId,
   isOpen = true,
   onClose,
   isDrawer = false,
 }) => {
-  const { user } = useAppStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, isLoggedIn } = useAppStore();
+
   const [comments, setComments] = useState<LessonComment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newCommentText, setNewCommentText] = useState('');
   const [replyingToId, setReplyingToId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
 
   const loadComments = () => {
     if (!lessonId) return;
@@ -51,8 +74,17 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
     }
   }, [lessonId, isOpen]);
 
+  const handleNavigateToLogin = () => {
+    const currentPath = location.pathname + location.search;
+    navigate(`/login?redirect=${encodeURIComponent(currentPath)}`);
+  };
+
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLoggedIn) {
+      handleNavigateToLogin();
+      return;
+    }
     if (!newCommentText.trim()) return;
 
     setIsSubmitting(true);
@@ -68,6 +100,10 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
   };
 
   const handlePostReply = async (parentId: number) => {
+    if (!isLoggedIn) {
+      handleNavigateToLogin();
+      return;
+    }
     if (!replyText.trim()) return;
 
     setIsSubmitting(true);
@@ -83,11 +119,12 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
     }
   };
 
-  const handleDeleteComment = async (commentId: number) => {
-    if (!window.confirm('Xác nhận xóa bình luận này?')) return;
+  const handleConfirmDelete = async () => {
+    if (!commentToDelete) return;
     try {
-      await readerApi.deleteLessonComment(lessonId, commentId);
-      setComments((prev) => prev.filter((c) => c.id !== commentId && c.parent_id !== commentId));
+      await readerApi.deleteLessonComment(lessonId, commentToDelete);
+      setComments((prev) => prev.filter((c) => c.id !== commentToDelete && c.parent_id !== commentToDelete));
+      setCommentToDelete(null);
     } catch (e: any) {
       alert(e.response?.data?.detail || 'Không thể xóa bình luận');
     }
@@ -106,7 +143,7 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
   });
 
   const contentUI = (
-    <div className="flex flex-col h-full text-slate-100 font-sans">
+    <div className="flex flex-col h-full text-slate-100 font-sans relative">
       {/* Header if in Drawer mode */}
       {isDrawer && (
         <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between gap-3 shrink-0">
@@ -123,7 +160,7 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -142,54 +179,64 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
           <div className="py-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl p-6">
             <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-600" />
             <p className="text-xs font-semibold text-slate-400">Chưa có bình luận nào</p>
-            <p className="text-[11px] text-slate-500 mt-1">Hãy là người đầu tiên đặt câu hỏi hoặc chia sẻ ý kiến!</p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {isLoggedIn
+                ? 'Hãy là người đầu tiên đặt câu hỏi hoặc chia sẻ ý kiến!'
+                : 'Đăng nhập để là người đầu tiên tham gia thảo luận bài học này.'}
+            </p>
           </div>
         ) : (
           topLevelComments.map((comment) => {
             const replies = repliesByParentId[comment.id] || [];
             const isAuthor = user?.id === comment.user_id;
             const canDelete = isAuthor || user?.role === 'admin';
+            const authorInitial = (comment.user?.full_name || comment.user?.username || 'U')[0].toUpperCase();
+            const isAdmin = comment.user?.role === 'admin';
 
             return (
               <div key={comment.id} className="space-y-3">
                 {/* Main Comment Card */}
-                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors space-y-2">
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sky-400 text-xs font-bold">
-                        {comment.user?.username?.[0]?.toUpperCase() || <UserIcon className="w-3.5 h-3.5" />}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-sky-600 to-cyan-500 flex items-center justify-center text-slate-950 text-xs font-black shadow-xs shrink-0">
+                        {authorInitial}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-white leading-none">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-white truncate max-w-[140px] sm:max-w-[200px]">
                             {comment.user?.full_name || comment.user?.username || 'Học viên'}
                           </span>
-                          {comment.user?.role === 'admin' && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[9px] font-bold flex items-center gap-0.5">
+                          {isAdmin ? (
+                            <span className="px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[9px] font-bold flex items-center gap-0.5 shrink-0">
                               <ShieldCheck className="w-2.5 h-2.5" />
                               Admin
                             </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] font-medium flex items-center gap-0.5 shrink-0">
+                              <GraduationCap className="w-2.5 h-2.5" />
+                              Học viên
+                            </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          {new Date(comment.created_at).toLocaleString([], {
-                            month: 'numeric',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                        <span className="text-[10px] text-slate-400 font-normal">
+                          {formatRelativeTime(comment.created_at)}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
                         onClick={() => {
+                          if (!isLoggedIn) {
+                            handleNavigateToLogin();
+                            return;
+                          }
                           setReplyingToId(replyingToId === comment.id ? null : comment.id);
                           setReplyText('');
                         }}
-                        className="p-1 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-slate-800 transition-colors text-xs flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-1 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-slate-800 transition-colors text-xs flex items-center gap-1 cursor-pointer"
                         title="Trả lời"
                       >
                         <Reply className="w-3.5 h-3.5" />
@@ -199,8 +246,8 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
                       {canDelete && (
                         <button
                           type="button"
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                          onClick={() => setCommentToDelete(comment.id)}
+                          className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
                           title="Xóa bình luận"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -223,8 +270,8 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
                         autoFocus
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
-                        placeholder={`Trả lời @${comment.user?.username}...`}
-                        className="flex-1 bg-slate-900 border border-sky-500/50 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                        placeholder={`Trả lời @${comment.user?.username || 'bạn học'}...`}
+                        className="flex-1 bg-slate-900 border border-sky-500/50 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -236,9 +283,19 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
                         type="button"
                         disabled={isSubmitting || !replyText.trim()}
                         onClick={() => handlePostReply(comment.id)}
-                        className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs transition-colors cursor-pointer"
+                        className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs transition-colors cursor-pointer"
                       >
-                        Gửi
+                        {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Gửi'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplyingToId(null);
+                          setReplyText('');
+                        }}
+                        className="px-2.5 py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white text-xs cursor-pointer"
+                      >
+                        Hủy
                       </button>
                     </div>
                   </div>
@@ -250,6 +307,8 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
                     {replies.map((reply) => {
                       const isReplyAuthor = user?.id === reply.user_id;
                       const canDeleteReply = isReplyAuthor || user?.role === 'admin';
+                      const replyInitial = (reply.user?.full_name || reply.user?.username || 'U')[0].toUpperCase();
+                      const isReplyAdmin = reply.user?.role === 'admin';
 
                       return (
                         <div
@@ -258,30 +317,28 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sky-400 text-[11px] font-bold">
-                                {reply.user?.username?.[0]?.toUpperCase() || 'U'}
+                              <div className="w-6 h-6 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-sky-400 text-[10px] font-bold">
+                                {replyInitial}
                               </div>
                               <span className="text-xs font-semibold text-white">
                                 {reply.user?.full_name || reply.user?.username || 'Học viên'}
                               </span>
-                              {reply.user?.role === 'admin' && (
-                                <span className="px-1 py-0.2 rounded bg-sky-500/10 text-sky-400 text-[9px] font-bold">
+                              {isReplyAdmin && (
+                                <span className="px-1 py-0.2 rounded bg-cyan-500/15 text-cyan-300 text-[9px] font-bold">
                                   Admin
                                 </span>
                               )}
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                {new Date(reply.created_at).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
+                              <span className="text-[10px] text-slate-400">
+                                {formatRelativeTime(reply.created_at)}
                               </span>
                             </div>
 
                             {canDeleteReply && (
                               <button
                                 type="button"
-                                onClick={() => handleDeleteComment(reply.id)}
-                                className="p-1 rounded text-slate-500 hover:text-rose-400 transition-colors"
+                                onClick={() => setCommentToDelete(reply.id)}
+                                className="p-1 rounded text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                                title="Xóa câu trả lời"
                               >
                                 <Trash2 className="w-3 h-3" />
                               </button>
@@ -301,26 +358,96 @@ export const LessonCommentsSection: React.FC<LessonCommentsSectionProps> = ({
         )}
       </div>
 
-      {/* New Comment Input Box */}
-      <form onSubmit={handlePostComment} className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900/90 shrink-0">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={newCommentText}
-            onChange={(e) => setNewCommentText(e.target.value)}
-            placeholder="Viết bình luận, đặt câu hỏi về bài học..."
-            className="flex-1 bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
-          />
-          <button
-            type="submit"
-            disabled={isSubmitting || !newCommentText.trim()}
-            className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-sky-600/20 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Gửi</span>
-          </button>
+      {/* Bottom Area: Auth Wall or Comment Input */}
+      {isLoggedIn ? (
+        <form onSubmit={handlePostComment} className="p-3 sm:p-4 border-t border-slate-800 bg-slate-900/90 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-600 to-cyan-500 flex items-center justify-center text-slate-950 text-xs font-black shrink-0 hidden sm:flex">
+              {(user?.full_name || user?.username || 'U')[0].toUpperCase()}
+            </div>
+            <input
+              type="text"
+              value={newCommentText}
+              onChange={(e) => setNewCommentText(e.target.value)}
+              placeholder="Viết bình luận, đặt câu hỏi về bài học..."
+              className="flex-1 bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={isSubmitting || !newCommentText.trim()}
+              className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-sky-600/20 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Gửi</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      ) : (
+        /* ======================================================== */
+        /* AUTH WALL: Elegant login callout for guests              */
+        /* ======================================================== */
+        <div className="p-4 sm:p-5 border-t border-slate-800 bg-gradient-to-b from-slate-900/90 to-slate-950 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-800/40 border border-sky-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+                <LogIn className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white">Tham gia thảo luận cùng cộng đồng</p>
+                <p className="text-[11px] text-slate-400">
+                  Đăng nhập tài khoản InMind để đặt câu hỏi, chia sẻ mẹo học tập và tương tác.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleNavigateToLogin}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-sky-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <LogIn className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Đăng nhập ngay</span>
+            </button>
+          </div>
         </div>
-      </form>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {commentToDelete !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-[#0f172a] border border-slate-700 p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-400">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <h4 className="font-bold text-sm text-white">Xác nhận xóa bình luận</h4>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bạn có chắc chắn muốn xóa bình luận này? Thao tác này không thể hoàn tác.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setCommentToDelete(null)}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-600/25 cursor-pointer"
+              >
+                Xóa vĩnh viễn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

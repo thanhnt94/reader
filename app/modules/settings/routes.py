@@ -21,6 +21,7 @@ class UpdateSettingsRequest(BaseModel):
     tts_auto_advance: Optional[bool] = None
     tts_sentence_delay: Optional[float] = None
     tts_lesson_delay: Optional[int] = None
+    show_furigana: Optional[bool] = None
 
 @router.get("")
 async def get_user_settings(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -59,6 +60,8 @@ async def update_user_settings(data: UpdateSettingsRequest, user: User = Depends
         settings_obj.tts_sentence_delay = data.tts_sentence_delay
     if data.tts_lesson_delay is not None:
         settings_obj.tts_lesson_delay = data.tts_lesson_delay
+    if data.show_furigana is not None:
+        settings_obj.show_furigana = data.show_furigana
 
     await db.commit()
     await db.refresh(settings_obj)

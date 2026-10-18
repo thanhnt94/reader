@@ -5,7 +5,7 @@ from app.core.db import engine, Base, SessionLocal
 from app.core.config import settings
 from app.modules.auth.models import User
 from app.modules.sso_module.models import SSOConfig
-from app.modules.course.models import Course, Chapter, Lesson, UserReadProgress, LessonComment, UserLessonNote
+from app.modules.course.models import Course, Chapter, Lesson, LessonAudioTrack, UserReadProgress, LessonComment, UserLessonNote
 from app.modules.settings.models import UserGlobalSettings
 from app.modules.auth.routes.auth_routes import hash_pw
 
@@ -32,11 +32,44 @@ async def init_db():
             await conn.exec_driver_sql("ALTER TABLE user_global_settings ADD COLUMN tts_lesson_delay INTEGER DEFAULT 2")
         except Exception:
             pass
+        try:
+            await conn.exec_driver_sql("ALTER TABLE user_global_settings ADD COLUMN show_furigana BOOLEAN DEFAULT 1")
+        except Exception:
+            pass
+        try:
+            await conn.exec_driver_sql("ALTER TABLE user_read_progress ADD COLUMN completed_sections JSON DEFAULT '[]'")
+        except Exception:
+            pass
+        try:
+            await conn.exec_driver_sql("""
+            CREATE TABLE IF NOT EXISTS lesson_audio_tracks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+                slot_num INTEGER NOT NULL DEFAULT 1,
+                mode_key VARCHAR(50) NOT NULL,
+                title VARCHAR(150) NOT NULL,
+                description VARCHAR(255),
+                audio_url VARCHAR(500),
+                duration_seconds FLOAT DEFAULT 0.0,
+                tts_provider VARCHAR(50) DEFAULT 'edge-tts',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_lesson_audio_slot UNIQUE (lesson_id, slot_num)
+            )
+            """)
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_lesson_audio_tracks_lesson_id ON lesson_audio_tracks(lesson_id)")
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_lesson_audio_tracks_slot_num ON lesson_audio_tracks(slot_num)")
+        except Exception:
+            pass
+        try:
+            await conn.exec_driver_sql("ALTER TABLE lesson_audio_tracks ADD COLUMN audio_script TEXT DEFAULT ''")
+        except Exception:
+            pass
 
     async with SessionLocal() as db:
         # 1. Initialize SSO Settings
         res_sso = await db.execute(select(SSOConfig))
-        sso_conf = res_sso.scalar_one_or_none()
+        sso_conf = res_sso.scalars().first()
         if not sso_conf:
             sso_conf = SSOConfig(
                 is_enabled=True,
@@ -48,7 +81,7 @@ async def init_db():
 
         # 2. Check and Seed Default Admin
         res_user = await db.execute(select(User).where(User.username == "admin"))
-        admin_user = res_user.scalar_one_or_none()
+        admin_user = res_user.scalars().first()
         if not admin_user:
             admin_user = User(
                 username="admin",
@@ -60,7 +93,7 @@ async def init_db():
 
         # 3. Check if courses exist; if not, auto-import sample or JSST folder if present
         res_course = await db.execute(select(Course))
-        first_course = res_course.scalar_one_or_none()
+        first_course = res_course.scalars().first()
         if not first_course:
             jsst_path = os.path.abspath(os.path.join(settings.BASE_DIR, "JSST"))
             if os.path.exists(jsst_path):

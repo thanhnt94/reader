@@ -141,11 +141,17 @@ async def sso_callback(request: Request, code: Optional[str] = None, db: AsyncSe
         logger.error(f"Failed to persist SSO user: {commit_err}")
         return RedirectResponse(url="/login?backdoor=1&error=User+sync+failed", status_code=303)
 
-    logger.info(f"SSO login success for user: {user.username} (id={user.id})")
+    target_url = request.cookies.get("sso_return_url") or request.query_params.get("state") or request.query_params.get("redirect") or "/"
+    if not target_url.startswith("/") or target_url.startswith("//"):
+        target_url = "/"
 
-    res = RedirectResponse(url="/", status_code=303)
+    logger.info(f"SSO login success for user: {user.username} (id={user.id}), redirecting to {target_url}")
+
+    res = RedirectResponse(url=target_url, status_code=303)
     signed_id = sign_cookie(str(user.id), settings.SECRET_KEY)
     res.set_cookie(key="user_id", value=signed_id, httponly=True, path="/", samesite="lax", max_age=2592000)
+    if "sso_return_url" in request.cookies:
+        res.delete_cookie("sso_return_url", path="/")
     return res
 
 class HandshakeRequest(BaseModel):

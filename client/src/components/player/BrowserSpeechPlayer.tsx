@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -17,7 +17,12 @@ import {
   Radio,
   FastForward,
   Timer,
-  Clock
+  Clock,
+  LocateFixed,
+  Headphones,
+  Loader2,
+  Settings,
+  Repeat
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -28,14 +33,68 @@ export interface SpeechSentence {
   text: string;
   lang: DetectedLang;
   noDelay?: boolean;
+  pauseAfterSec?: number;
+  isSignal?: boolean;
+}
+
+/**
+ * Synthesizes a clean two-tone exam chime (880Hz -> 1175Hz) via Web Audio API.
+ */
+export function playExamChime(): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) {
+        resolve();
+        return;
+      }
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      // Tone 1: 880Hz (A5)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now);
+      gain1.gain.setValueAtTime(0, now);
+      gain1.gain.linearRampToValueAtTime(0.25, now + 0.02);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.3);
+
+      // Tone 2: 1175Hz (D6)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1175, now + 0.22);
+      gain2.gain.setValueAtTime(0, now + 0.22);
+      gain2.gain.linearRampToValueAtTime(0.3, now + 0.25);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.22);
+      osc2.stop(now + 0.8);
+
+      setTimeout(() => {
+        try { ctx.close(); } catch (e) {}
+        resolve();
+      }, 850);
+    } catch (e) {
+      console.warn('Web Audio chime error:', e);
+      resolve();
+    }
+  });
 }
 
 /**
  * Analyzes character distribution and vocabulary clues to identify Japanese vs Vietnamese vs English.
+ * Pure numbers, symbols, Latin abbreviations, or untagged content gracefully inherit the Main Language.
  */
-export function detectLanguage(text: string): DetectedLang {
+export function detectLanguage(text: string, mainLang: DetectedLang = 'ja-JP'): DetectedLang {
   const trimmed = text.trim();
-  if (!trimmed) return 'vi-VN';
+  if (!trimmed) return mainLang;
 
   // 1. Japanese Kanji, Hiragana, Katakana check
   const jaMatches = trimmed.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g);
@@ -47,11 +106,14 @@ export function detectLanguage(text: string): DetectedLang {
   );
   const viCount = viMatches ? viMatches.length : 0;
 
-  // 3. Common Vietnamese unaccented words or labels (like "Cau", "Dich", "Buoc", "Bai", "Mau", "Cu phap")
-  const hasViKeywords = /\b(câu|bài|bước|dịch|nghĩa|tiếng|ví dụ|hỏi|đáp|trả lời|dàn ý|từ vựng|mẫu|cú pháp|ngữ cảnh|tiến độ|trạng thái|thời gian|công việc|cộng|động từ|thể|tập|nhật|việt|nói|nghe|đọc|viết)\b/i.test(trimmed);
+  // 3. Common Vietnamese unaccented words or labels
+  const hasViKeywords = /\b(câu|bài|bước|dịch|nghĩa|tiếng|ví dụ|hỏi|đáp|trả lời|dàn ý|từ vựng|mẫu|cú pháp|ngữ cảnh|tiến độ|trạng thái|thời gian|công việc|cộng|động từ|thể|tập|nhật|việt|nói|nghe|đọc|viết|tôi|bạn|thường|sử dụng|nhiều|hơn|bởi vì)\b/i.test(trimmed);
 
   if (jaCount > 0 && jaCount >= viCount && !hasViKeywords) {
     return 'ja-JP';
+  }
+  if ((viCount > 0 || hasViKeywords) && jaCount === 0) {
+    return 'vi-VN';
   }
   if (viCount > 0 || hasViKeywords) {
     return 'vi-VN';
@@ -66,7 +128,26 @@ export function detectLanguage(text: string): DetectedLang {
     return 'en-US';
   }
 
-  // Default to Vietnamese in InMind Reader platform
+  // Pure numbers, abbreviations, neutral symbols fall back to Main Language!
+  return mainLang;
+}
+
+/**
+ * Automatically detects whether a document's main language is Japanese, Vietnamese or English,
+ * checking YAML frontmatter (lang/main_lang) first or presence of Japanese characters.
+ */
+export function detectDocumentMainLang(md: string): DetectedLang {
+  if (!md) return 'ja-JP';
+  const frontmatterMatch = md.match(/^---\s*[\s\S]*?(?:main_lang|lang):\s*['"]?([a-zA-Z_-]+)['"]?[\s\S]*?---/i);
+  if (frontmatterMatch) {
+    const code = frontmatterMatch[1].toLowerCase();
+    if (code.startsWith('ja')) return 'ja-JP';
+    if (code.startsWith('vi')) return 'vi-VN';
+    if (code.startsWith('en')) return 'en-US';
+  }
+  if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(md)) {
+    return 'ja-JP';
+  }
   return 'vi-VN';
 }
 
@@ -74,8 +155,9 @@ export function detectLanguage(text: string): DetectedLang {
  * Strips HTML tags, removes <rt>...</rt> ruby annotations, cleans markdown formatting,
  * processes tables cell-by-cell, separates mixed language sentences,
  * and splits into natural speech sentences with accurate language tags.
+ * Pure numbers and neutral symbols inherit the configured mainLang.
  */
-export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
+export function cleanTextForSpeech(rawMarkdown: string, mainLang: DetectedLang = 'ja-JP'): SpeechSentence[] {
   if (!rawMarkdown) return [];
 
   let text = rawMarkdown;
@@ -100,8 +182,7 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
   text = text.replace(/<rt[^>]*>[\s\S]*?<\/rt>/gi, '');
   text = text.replace(/<rp[^>]*>[\s\S]*?<\/rp>/gi, '');
 
-  // 6. Extract explicit language tags if user used <ja>...</ja> or <vi>...</vi>
-  // We'll preserve them by marker replacement or processing
+  // 6. Extract lines
   const lines = text.split('\n');
   const sentences: SpeechSentence[] = [];
   let idx = 0;
@@ -115,8 +196,34 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
       .replace(/\s+/g, ' ')
       .trim();
 
-    // Convert plus signs to "cộng" so it reads naturally in Vietnamese, never in English "plus"
-    cleaned = cleaned.replace(/[+＋]/g, ' cộng ').replace(/\s+/g, ' ').trim();
+    // Convert plus signs to "cộng" if surrounding is Vietnamese, otherwise keep space
+    if (/[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(cleaned)) {
+      cleaned = cleaned.replace(/[+＋]/g, ' cộng ').replace(/\s+/g, ' ').trim();
+    } else {
+      cleaned = cleaned.replace(/[+＋]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    // Check pause directives e.g. [pause: 2s], [pause]
+    const pauseMatch = cleaned.match(/^\[pause(?::\s*([\d.]+)\s*(?:s|ms)?)?\]/i);
+    if (pauseMatch || /^\[pause/i.test(cleaned)) {
+      const pauseSec = pauseMatch && pauseMatch[1] ? parseFloat(pauseMatch[1]) : 2;
+      if (sentences.length > 0) {
+        sentences[sentences.length - 1].pauseAfterSec = pauseSec;
+      }
+      return;
+    }
+
+    // Check signal / chime / beep directives e.g. [chime], [signal], [beep]
+    if (/^\[(?:signal|chime|beep)(?::\s*[\w-]+)?\]$/i.test(cleaned)) {
+      const isFirstChime = sentences.filter((s) => s.isSignal).length === 0;
+      sentences.push({
+        index: idx++,
+        text: isFirstChime ? '🔔 Chuông bắt đầu (45s trả lời)' : '🔔 Chuông kết thúc (Hết giờ)',
+        lang: 'ja-JP',
+        isSignal: true,
+      });
+      return;
+    }
 
     // Skip isolated bullets, Roman numerals (I, II, III...), plus signs, or single letters
     if (/^(?:[IVXLCDM]+\.?|\d+\.?|[+＋*•·–—\-#\s]+|[a-zA-Z]\.?)$/i.test(cleaned)) {
@@ -124,7 +231,7 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
     }
 
     if (cleaned.length > 0 && !/^[-_—\s,.:;|]+$/.test(cleaned)) {
-      const lang = forcedLang || detectLanguage(cleaned);
+      const lang = forcedLang || detectLanguage(cleaned, mainLang);
       sentences.push({
         index: idx++,
         text: cleaned,
@@ -159,7 +266,7 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
         .slice(1, -1)
         .map((c) => c.trim());
 
-      // If it's a table header with generic column names like ["Bước", "Tiếng Việt", "Tiếng Nhật"], skip
+      // If it's a table header with generic column names, skip
       const isHeaderRow = cells.every((c) =>
         /^(bước|tiếng việt|tiếng nhật|stt|no|nghĩa|kanji|furigana)$/i.test(c.replace(/[*_~]/g, ''))
       );
@@ -169,7 +276,6 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
 
       // Read each non-empty data cell individually with its own detected language
       for (const cell of cells) {
-        // Strip inline tags
         const cellClean = cell.replace(/<rt[^>]*>[\s\S]*?<\/rt>/gi, '').replace(/<[^>]+>/g, '');
         pushSentence(cellClean);
       }
@@ -199,9 +305,6 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
     // Clean Roman numerals at start of lines (if any residual)
     line = line.replace(/^[IVXLCDM]+\.\s*/i, '');
 
-    // Replace inline plus signs with "cộng"
-    line = line.replace(/[+＋]/g, ' cộng ');
-
     // Clean emojis & decorative symbols from beginning of line (e.g. 📌, 💬, ⚡, 💡)
     line = line.replace(/^[📌⚡💡💬👉➡■●★\s]+/u, '');
 
@@ -209,7 +312,6 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
     line = line.replace(/^[*_~]{1,3}\s*/, '');
 
     // Strip audio prefixes completely so they are NEVER spoken:
-    // e.g. "Câu 03:", "Dịch câu hỏi:", "Tình huống:", "Dịch tình huống:", "Tiếng Nhật:", "Dịch nghĩa:"
     line = line.replace(
       /^(?:[Cc]âu\s*\d+|[Dd]ịch\s*câu\s*hỏi|[Dd]ịch\s*tình\s*huống|[Tt]ình\s*huống|[Dd]ịch\s*nghĩa|[Tt]iếng\s*[Nn]hật|[Tt]iếng\s*[Vv]iệt|[Tt]ừ\s*vựng|[Gg]hi\s*chú|[Ll]ưu\s*ý)[\s:*_.-]*/i,
       ''
@@ -219,8 +321,30 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
     line = line.replace(/^[*_~:\s-]+/, '').trim();
     if (!line) continue;
 
-    // Check if line has mixed Japanese characters AND Vietnamese text (e.g. grammar formulas):
-    // e.g. "Cú pháp: Động từ thể た ＋ ところです" or "Cú pháp: Động từ bỏ ます ＋ 次第、すぐに"
+    // 1. Check for explicit manual override tags: <ja>...</ja>, <vi>...</vi>, <en>...</en>
+    if (/<(?:ja|vi|en)>[\s\S]*?<\/(?:ja|vi|en)>/i.test(line)) {
+      const tagSegments = line.split(/(<(?:ja|vi|en)>[\s\S]*?<\/(?:ja|vi|en)>)/gi);
+      for (const seg of tagSegments) {
+        const segTrim = seg.trim();
+        if (!segTrim) continue;
+        if (/^<ja>([\s\S]*?)<\/ja>$/i.test(segTrim)) {
+          const match = segTrim.match(/^<ja>([\s\S]*?)<\/ja>$/i);
+          if (match && match[1]) pushSentence(match[1], 'ja-JP');
+        } else if (/^<vi>([\s\S]*?)<\/vi>$/i.test(segTrim)) {
+          const match = segTrim.match(/^<vi>([\s\S]*?)<\/vi>$/i);
+          if (match && match[1]) pushSentence(match[1], 'vi-VN');
+        } else if (/^<en>([\s\S]*?)<\/en>$/i.test(segTrim)) {
+          const match = segTrim.match(/^<en>([\s\S]*?)<\/en>$/i);
+          if (match && match[1]) pushSentence(match[1], 'en-US');
+        } else {
+          pushSentence(segTrim, detectLanguage(segTrim, mainLang));
+        }
+      }
+      continue;
+    }
+
+    // 2. Check if line has mixed Japanese characters AND Vietnamese text (without explicit tags):
+    // e.g. "Cú pháp: Động từ thể て ＋ はじめて、〜" or "社会人: người đi làm"
     const hasJa = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(line);
     const hasVi = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]/i.test(line);
     const hasViKw = /\b(cú\s*pháp|động\s*từ|thể|bỏ|từ\s*điển|ngữ\s*cảnh|nghĩa|mẫu|ví\s*dụ|cộng)\b/i.test(line);
@@ -239,49 +363,30 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
         } else {
           const cleanVi = tok.replace(/^[*_~:\s-]+|[*_~:\s-]+$/g, '').trim();
           if (cleanVi) {
-            pushSentence(cleanVi, 'vi-VN', isNotLast);
+            pushSentence(cleanVi, detectLanguage(cleanVi, mainLang), isNotLast);
           }
         }
       }
       continue;
     }
 
-    // Check for explicit <ja>...</ja> or <vi>...</vi> tags
-    if (/<ja>[\s\S]*?<\/ja>/i.test(line) || /<vi>[\s\S]*?<\/vi>/i.test(line)) {
-      // Split on tags
-      const tagSegments = line.split(/(<ja>[\s\S]*?<\/ja>|<vi>[\s\S]*?<\/vi>)/gi);
-      for (const seg of tagSegments) {
-        if (/^<ja>([\s\S]*?)<\/ja>$/i.test(seg)) {
-          const match = seg.match(/^<ja>([\s\S]*?)<\/ja>$/i);
-          if (match && match[1]) pushSentence(match[1], 'ja-JP');
-        } else if (/^<vi>([\s\S]*?)<\/vi>$/i.test(seg)) {
-          const match = seg.match(/^<vi>([\s\S]*?)<\/vi>$/i);
-          if (match && match[1]) pushSentence(match[1], 'vi-VN');
-        } else {
-          pushSentence(seg);
-        }
-      }
-      continue;
-    }
-
-    // Check if line is a vocabulary or comparison line with arrows (➡) or colons
-    // e.g. "四季: bốn mùa ➡ 一年の中: trong năm"
+    // 3. Check if line is a vocabulary or comparison line with arrows (➡) or colons
     if (line.includes('➡') || (line.includes(':') && line.includes('ruby'))) {
       const parts = line.split(/[➡:]/);
       for (const p of parts) {
-        pushSentence(p);
+        pushSentence(p, detectLanguage(p, mainLang));
       }
       continue;
     }
 
-    // Split sentences on Japanese punctuation ([。！？]) or Western sentence boundaries ([.!?]+ followed by space or end)
+    // 4. Split sentences on Japanese punctuation ([。！？]) or Western sentence boundaries ([.!?]+ followed by space or end)
     const punctuationSplit = line.split(/([。！？]+|[.!?]+(?:\s+|$))/);
     let buffer = '';
     for (const part of punctuationSplit) {
       if (/^[。！？.!?\s]+$/.test(part)) {
         buffer += part;
         if (buffer.trim()) {
-          pushSentence(buffer.trim());
+          pushSentence(buffer.trim(), detectLanguage(buffer.trim(), mainLang));
         }
         buffer = '';
       } else {
@@ -289,14 +394,32 @@ export function cleanTextForSpeech(rawMarkdown: string): SpeechSentence[] {
       }
     }
     if (buffer.trim()) {
-      pushSentence(buffer.trim());
+      pushSentence(buffer.trim(), detectLanguage(buffer.trim(), mainLang));
     }
   }
 
   return sentences;
 }
 
-interface BrowserSpeechPlayerProps {
+export type RepeatMode = '1x' | '2x' | '3x' | 'loop';
+
+export interface BrowserSpeechController {
+  isPlaying: boolean;
+  isPaused: boolean;
+  currentIndex: number;
+  totalSentences: number;
+  speed: number;
+  currentSentence?: SpeechSentence | null;
+  handlePlay: () => void;
+  handlePause: () => void;
+  handleToggle: () => void;
+  handlePrev: () => void;
+  handleNext: () => void;
+  handleSpeedChange: (speed: number) => void;
+  cycleSpeed: () => void;
+}
+
+export interface BrowserSpeechPlayerProps {
   lessonId?: number;
   rawMarkdown: string;
   title: string;
@@ -305,6 +428,18 @@ interface BrowserSpeechPlayerProps {
   onLessonComplete?: () => void;
   hasNextLesson?: boolean;
   autoPlay?: boolean;
+  hasAudioUrl?: boolean;
+  onSwitchToStudioAudio?: () => void;
+  onRequestGenerateTTS?: () => void;
+  isGeneratingTTS?: boolean;
+  onActiveSentenceChange?: (sentence: SpeechSentence | null) => void;
+  onSentenceProgress?: (progress: number) => void;
+  onScrollToActiveSentence?: () => void;
+  targetSentenceIndex?: number | null;
+  onTargetSentenceHandled?: () => void;
+  headless?: boolean;
+  onControllerReady?: (controller: BrowserSpeechController) => void;
+  autoAdvance?: boolean;
 }
 
 export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
@@ -316,17 +451,40 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   onLessonComplete,
   hasNextLesson = false,
   autoPlay = false,
+  hasAudioUrl = false,
+  onSwitchToStudioAudio,
+  onRequestGenerateTTS,
+  isGeneratingTTS = false,
+  onActiveSentenceChange,
+  onSentenceProgress,
+  onScrollToActiveSentence,
+  targetSentenceIndex = null,
+  onTargetSentenceHandled,
+  headless = false,
+  onControllerReady,
+  autoAdvance,
 }) => {
   const { settings, updateSettings } = useAppStore();
 
   const [sentences, setSentences] = useState<SpeechSentence[]>([]);
   const [filterMode, setFilterMode] = useState<'all' | 'ja' | 'vi'>('all');
+  const [mainLang, setMainLang] = useState<DetectedLang>(() => detectDocumentMainLang(rawMarkdown));
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [sentenceProgress, setSentenceProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [speed, setSpeed] = useState(1.0);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('1x');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  // Shadowing Repeat Ref
+  const repeatCountRef = useRef(0);
+  const repeatModeRef = useRef<RepeatMode>('1x');
+  useEffect(() => {
+    repeatModeRef.current = repeatMode;
+  }, [repeatMode]);
 
   // Screen Wake Lock API State & Ref
   const wakeLockRef = useRef<any>(null);
@@ -340,6 +498,11 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   const hasNextLessonRef = useRef(hasNextLesson);
   const settingsRef = useRef(settings);
   const hasAutoPlayedRef = useRef(false);
+
+  const autoAdvanceRef = useRef(autoAdvance);
+  useEffect(() => {
+    autoAdvanceRef.current = autoAdvance;
+  }, [autoAdvance]);
 
   useEffect(() => {
     onLessonCompleteRef.current = onLessonComplete;
@@ -469,6 +632,9 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
       audioRef.current.onerror = null;
     }
     releaseWakeLock();
+    if (onActiveSentenceChange) {
+      onActiveSentenceChange(null);
+    }
   };
 
   // Initialize SpeechSynthesis and load browser voices
@@ -490,18 +656,64 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     };
   }, []);
 
-  // Filter sentences according to selected filter mode
-  const activeSentences = sentences.filter((s) => {
-    if (filterMode === 'ja') return s.lang === 'ja-JP';
-    if (filterMode === 'vi') return s.lang === 'vi-VN';
-    return true;
-  });
+  // Filter sentences according to selected filter mode (Memoized to prevent infinite render loops)
+  const activeSentences = useMemo(() => {
+    return sentences.filter((s) => {
+      if (filterMode === 'ja') return s.lang === 'ja-JP';
+      if (filterMode === 'vi') return s.lang === 'vi-VN';
+      return true;
+    });
+  }, [sentences, filterMode]);
+
+  // Jump to target sentence when requested from tap-to-speak
+  useEffect(() => {
+    if (
+      targetSentenceIndex !== null &&
+      targetSentenceIndex !== undefined &&
+      targetSentenceIndex >= 0 &&
+      activeSentences.length > 0
+    ) {
+      const targetIdx = Math.min(activeSentences.length - 1, Math.max(0, targetSentenceIndex));
+      repeatCountRef.current = 0;
+      setCurrentIndex(targetIdx);
+      speakSentence(targetIdx);
+      onTargetSentenceHandled?.();
+    }
+  }, [targetSentenceIndex, activeSentences.length]);
+
+  // Notify parent of active sentence changes for live karaoke highlight on screen (Deduped by string key)
+  const lastActiveSentenceKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (onActiveSentenceChange) {
+      const current = isOpen && (isPlaying || isPaused) ? activeSentences[currentIndex] || null : null;
+      const currentKey = current ? `${current.index}-${current.text}` : null;
+      if (lastActiveSentenceKeyRef.current !== currentKey) {
+        lastActiveSentenceKeyRef.current = currentKey;
+        onActiveSentenceChange(current);
+      }
+    }
+  }, [isOpen, isPlaying, isPaused, currentIndex, activeSentences, onActiveSentenceChange]);
+
+  // Cycle through available main languages (JA ➡ VI ➡ EN)
+  const cycleMainLang = () => {
+    const next: DetectedLang = mainLang === 'ja-JP' ? 'vi-VN' : mainLang === 'vi-VN' ? 'en-US' : 'ja-JP';
+    setMainLang(next);
+    if (!rawMarkdown) return;
+    const parsed = cleanTextForSpeech(rawMarkdown, next);
+    setSentences(parsed);
+    setCurrentIndex(0);
+    if (isPlaying) {
+      handleStop();
+    }
+  };
 
   // Parse markdown into clean speech sentences and trigger autoplay if continuous mode is active
   useEffect(() => {
     if (!rawMarkdown) return;
 
-    const parsed = cleanTextForSpeech(rawMarkdown);
+    const docMainLang = detectDocumentMainLang(rawMarkdown);
+    setMainLang(docMainLang);
+    const parsed = cleanTextForSpeech(rawMarkdown, docMainLang);
     setSentences(parsed);
     setCurrentIndex(0);
     setTransitionCountdown(null);
@@ -523,10 +735,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
           : parsed;
 
       // Start sentence 0 of new lesson immediately on persistent unlocked audio element
-      const timer = setTimeout(() => {
-        speakSentence(0, list);
-      }, 100);
-      return () => clearTimeout(timer);
+      speakSentence(0, list);
     } else {
       setIsPlaying(false);
       setIsPaused(false);
@@ -582,6 +791,8 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     }
 
     setCurrentIndex(index);
+    setSentenceProgress(0);
+    if (onSentenceProgress) onSentenceProgress(0);
     setIsPlaying(true);
     setIsPaused(false);
 
@@ -589,8 +800,26 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     const matchedVoice = getVoiceForLang(target.lang);
 
     const handleSentenceFinish = () => {
+      // 1. Check Shadowing repeat mode
+      const mode = repeatModeRef.current;
+      const targetRepeat = mode === 'loop' ? Infinity : (parseInt(mode, 10) || 1);
+      if (repeatCountRef.current < targetRepeat - 1) {
+        repeatCountRef.current += 1;
+        const sentenceDelaySec = target.noDelay ? 0.2 : (settingsRef.current.tts_sentence_delay ?? 0.6);
+        const delayMs = Math.max(100, Math.round(sentenceDelaySec * 1000));
+
+        if (sentenceDelayTimerRef.current) clearTimeout(sentenceDelayTimerRef.current);
+        sentenceDelayTimerRef.current = setTimeout(() => {
+          speakSentence(index, list);
+        }, delayMs);
+        return;
+      }
+
+      // Reached repetition count for this sentence, reset for next
+      repeatCountRef.current = 0;
+
       if (index + 1 < list.length) {
-        const sentenceDelaySec = target.noDelay ? 0.15 : (settingsRef.current.tts_sentence_delay ?? 0.5);
+        const sentenceDelaySec = target.pauseAfterSec ?? (target.noDelay ? 0.15 : (settingsRef.current.tts_sentence_delay ?? 0.5));
         const delayMs = Math.max(0, Math.round(sentenceDelaySec * 1000));
 
         if (delayMs > 0) {
@@ -604,14 +833,19 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
           speakSentence(index + 1, list);
         }
       } else {
-        // Reached end of current lesson: auto advance if continuous mode or auto_advance setting is on
+        // Reached end of current lesson: auto advance if autoAdvance prop or continuous mode or auto_advance setting is on
+        const shouldAdvance =
+          autoAdvanceRef.current !== undefined
+            ? autoAdvanceRef.current
+            : (settingsRef.current.tts_auto_advance !== false || isContinuousPlayingRef.current);
+
         if (
-          (settingsRef.current.tts_auto_advance || isContinuousPlayingRef.current) &&
+          shouldAdvance &&
           hasNextLessonRef.current &&
           onLessonCompleteRef.current
         ) {
           isContinuousPlayingRef.current = true;
-          const lessonDelaySec = settingsRef.current.tts_lesson_delay ?? 2;
+          const lessonDelaySec = settingsRef.current.tts_lesson_delay ?? 1;
           setTransitionCountdown(Math.max(1, lessonDelaySec));
         } else {
           isContinuousPlayingRef.current = false;
@@ -621,6 +855,14 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
         }
       }
     };
+
+    // If target is an exam ending chime or sound signal, play tone and finish sentence
+    if (target.isSignal) {
+      playExamChime().then(() => {
+        handleSentenceFinish();
+      });
+      return;
+    }
 
     // Preload next sentence audio in background for instant playback
     if (index + 1 < list.length) {
@@ -640,6 +882,14 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
           utt.lang = target.lang;
           utt.rate = speed;
           if (matchedVoice) utt.voice = matchedVoice;
+          utt.onboundary = (e: any) => {
+            if (target.text.length > 0) {
+              const charIdx = e.charIndex || 0;
+              const prog = Math.min(1, Math.max(0, charIdx / target.text.length));
+              setSentenceProgress(prog);
+              if (onSentenceProgress) onSentenceProgress(prog);
+            }
+          };
           utt.onend = handleSentenceFinish;
           utt.onerror = () => {
             console.warn('Speech synthesis error on fallback');
@@ -665,6 +915,13 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     audio.src = streamUrl;
     audio.playbackRate = speed;
     audio.onended = handleSentenceFinish;
+    audio.ontimeupdate = () => {
+      if (audio.duration && audio.duration > 0) {
+        const prog = Math.min(1, Math.max(0, audio.currentTime / audio.duration));
+        setSentenceProgress(prog);
+        if (onSentenceProgress) onSentenceProgress(prog);
+      }
+    };
 
     audio.onerror = (e) => {
       console.warn('Audio stream error, falling back to speech synthesis:', e);
@@ -682,6 +939,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
   const handlePlay = () => {
     isContinuousPlayingRef.current = true;
+    repeatCountRef.current = 0;
     setTransitionCountdown(null);
     if (sentenceDelayTimerRef.current) {
       clearTimeout(sentenceDelayTimerRef.current);
@@ -725,6 +983,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
 
   const handleStop = () => {
     isContinuousPlayingRef.current = false;
+    repeatCountRef.current = 0;
     stopAllAudio();
     setIsPlaying(false);
     setIsPaused(false);
@@ -732,6 +991,7 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handlePrev = () => {
+    repeatCountRef.current = 0;
     if (sentenceDelayTimerRef.current) {
       clearTimeout(sentenceDelayTimerRef.current);
       sentenceDelayTimerRef.current = null;
@@ -744,14 +1004,22 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
   };
 
   const handleNext = () => {
+    repeatCountRef.current = 0;
     if (sentenceDelayTimerRef.current) {
       clearTimeout(sentenceDelayTimerRef.current);
       sentenceDelayTimerRef.current = null;
     }
-    const nextIdx = Math.min(activeSentences.length - 1, currentIndex + 1);
-    setCurrentIndex(nextIdx);
-    if (isPlaying) {
-      speakSentence(nextIdx);
+    if (currentIndex + 1 < activeSentences.length) {
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
+      if (isPlaying) {
+        speakSentence(nextIdx);
+      }
+    } else {
+      // If already on the last sentence of current question, jumping forward advances to the next question
+      if (hasNextLessonRef.current && onLessonCompleteRef.current) {
+        onLessonCompleteRef.current();
+      }
     }
   };
 
@@ -762,7 +1030,58 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  const lastControllerStateRef = useRef<{
+    isPlaying: boolean;
+    isPaused: boolean;
+    currentIndex: number;
+    totalSentences: number;
+    speed: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!onControllerReady) return;
+    const last = lastControllerStateRef.current;
+    if (
+      last &&
+      last.isPlaying === isPlaying &&
+      last.isPaused === isPaused &&
+      last.currentIndex === currentIndex &&
+      last.totalSentences === activeSentences.length &&
+      last.speed === speed
+    ) {
+      return;
+    }
+
+    lastControllerStateRef.current = {
+      isPlaying,
+      isPaused,
+      currentIndex,
+      totalSentences: activeSentences.length,
+      speed,
+    };
+
+    onControllerReady({
+      isPlaying,
+      isPaused,
+      currentIndex,
+      totalSentences: activeSentences.length,
+      speed,
+      currentSentence: activeSentences[currentIndex] || null,
+      handlePlay,
+      handlePause,
+      handleToggle: isPlaying ? handlePause : handlePlay,
+      handlePrev,
+      handleNext,
+      handleSpeedChange,
+      cycleSpeed: () => {
+        const speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
+        const nextIdx = (speeds.indexOf(speed) + 1) % speeds.length;
+        handleSpeedChange(speeds[nextIdx]);
+      },
+    });
+  }, [isPlaying, isPaused, currentIndex, activeSentences.length, speed, onControllerReady]);
+
+  if (headless || !isOpen) return null;
 
   // Mini-pill collapsed view (completely non-intrusive on mobile!)
   if (isCollapsed) {
@@ -807,11 +1126,22 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                 <span className="text-[10px] text-sky-400 font-mono">
                   {currentSentence?.lang === 'ja-JP' ? '🇯🇵' : currentSentence?.lang === 'vi-VN' ? '🇻🇳' : '🇺🇸'}
                 </span>
+                <button
+                  type="button"
+                  onClick={cycleMainLang}
+                  className="text-[9px] text-slate-300 hover:text-white font-mono bg-slate-800/80 hover:bg-slate-700 px-1.5 py-0.5 rounded cursor-pointer transition-colors border border-slate-700/60"
+                  title="Ngôn ngữ chính (Số & ký hiệu mặc định): Bấm để đổi (JA ➡ VI ➡ EN)"
+                >
+                  Main: {mainLang === 'ja-JP' ? '🇯🇵' : mainLang === 'vi-VN' ? '🇻🇳' : '🇺🇸'}
+                </button>
                 {settings.tts_wake_lock && (
                   <span title="Màn hình sáng" className="text-amber-400 text-[10px]">☀️</span>
                 )}
                 {settings.tts_auto_advance && (
                   <span title="Chạy liên tục (Máy audio)" className="text-sky-400 text-[10px]">📻</span>
+                )}
+                {repeatMode !== '1x' && (
+                  <span title={`Đang lặp Shadowing ${repeatMode}`} className="text-emerald-400 text-[10px] font-mono font-bold bg-emerald-500/15 px-1 py-0.5 rounded border border-emerald-500/30">🔁{repeatMode}</span>
                 )}
               </div>
 
@@ -862,29 +1192,30 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
     );
   }
 
-  // Expanded View
+  // Expanded View - Modern, sleek floating audio capsule
   return (
-    <div className="fixed bottom-[72px] inset-x-2 sm:bottom-4 sm:inset-x-4 max-w-2xl mx-auto z-50 animate-in slide-in-from-bottom duration-300 font-sans">
-      <div className="bg-slate-900/95 border border-sky-900/50 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xl backdrop-blur-2xl text-slate-100 flex flex-col gap-2.5">
-        {/* Header Bar */}
-        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
-              <Volume2 className="w-3.5 h-3.5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-xs text-white truncate max-w-[120px] sm:max-w-xs">{title}</span>
-                <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-[9px] font-semibold text-sky-400 border border-slate-700/60 shrink-0">
-                  Multilingual TTS
-                </span>
-              </div>
-            </div>
+    <div className="fixed bottom-[72px] inset-x-2 sm:bottom-4 sm:inset-x-auto sm:right-6 sm:max-w-xl sm:w-full z-50 animate-in slide-in-from-bottom duration-300 font-sans">
+      {/* Collapsible Settings Drawer - only shown when ⚙️ is tapped */}
+      {isSettingsOpen && (
+        <div className="mb-2 p-3 sm:p-3.5 rounded-2xl bg-slate-900/98 border border-slate-700/90 shadow-2xl backdrop-blur-2xl text-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200 flex flex-col gap-2.5 text-xs">
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+            <span className="font-bold text-sky-400 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+              <Settings className="w-3.5 h-3.5 text-sky-400" />
+              <span>Cài đặt Đọc TTS</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Filter Mode Selector */}
-            <div className="flex rounded-xl bg-slate-800 p-0.5 text-[10px] font-semibold">
+          {/* Filter Sentences Mode */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-400 text-[11px]">Lọc nội dung đọc:</span>
+            <div className="flex rounded-lg bg-slate-800 p-0.5 text-[10px] font-semibold">
               <button
                 type="button"
                 onClick={() => {
@@ -892,12 +1223,11 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                   setCurrentIndex(0);
                   if (isPlaying) handleStop();
                 }}
-                className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                  filterMode === 'all' ? 'bg-slate-700 text-sky-300 shadow-xs' : 'text-slate-400 hover:text-white'
+                className={`px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                  filterMode === 'all' ? 'bg-sky-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
                 }`}
-                title="Read all sentences"
               >
-                All
+                Tất cả
               </button>
               <button
                 type="button"
@@ -906,12 +1236,11 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                   setCurrentIndex(0);
                   if (isPlaying) handleStop();
                 }}
-                className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                  filterMode === 'ja' ? 'bg-slate-700 text-sky-300 shadow-xs' : 'text-slate-400 hover:text-white'
+                className={`px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                  filterMode === 'ja' ? 'bg-sky-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
                 }`}
-                title="Read Japanese sentences only"
               >
-                🇯🇵 <span className="hidden sm:inline">Japanese</span>
+                🇯🇵 Nhật
               </button>
               <button
                 type="button"
@@ -920,310 +1249,315 @@ export const BrowserSpeechPlayer: React.FC<BrowserSpeechPlayerProps> = ({
                   setCurrentIndex(0);
                   if (isPlaying) handleStop();
                 }}
-                className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                  filterMode === 'vi' ? 'bg-slate-700 text-sky-300 shadow-xs' : 'text-slate-400 hover:text-white'
+                className={`px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                  filterMode === 'vi' ? 'bg-sky-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
                 }`}
-                title="Read Vietnamese sentences only"
               >
-                🇻🇳 <span className="hidden sm:inline">Vietnamese</span>
+                🇻🇳 Việt
               </button>
             </div>
+          </div>
+
+          {/* Smart Toggles: Furigana, Wake Lock & Auto-advance */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={() => updateSettings({ show_furigana: settings.show_furigana === false ? true : false })}
+              className={`flex items-center justify-center gap-1.5 p-2 rounded-xl text-[11px] font-medium border transition-all cursor-pointer ${
+                settings.show_furigana !== false
+                  ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                  : 'bg-slate-800/60 text-slate-400 border-slate-700/50 hover:text-white'
+              }`}
+              title="Bật/Tắt hiển thị phiên âm Furigana trên chữ Hán"
+            >
+              <span className="text-[10px] font-bold font-mono px-1 rounded bg-slate-900 border border-slate-700">振</span>
+              <span>{settings.show_furigana !== false ? 'Furigana: BẬT' : 'Furigana: TẮT'}</span>
+            </button>
 
             <button
               type="button"
-              onClick={() => setIsCollapsed(true)}
-              className="p-1 sm:p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Thu nhỏ thanh phát"
+              onClick={() => updateSettings({ tts_wake_lock: !settings.tts_wake_lock })}
+              className={`flex items-center justify-center gap-1.5 p-2 rounded-xl text-[11px] font-medium border transition-all cursor-pointer ${
+                settings.tts_wake_lock
+                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  : 'bg-slate-800/60 text-slate-400 border-slate-700/50 hover:text-white'
+              }`}
             >
-              <Minimize2 className="w-4 h-4" />
+              <Sun className={`w-3.5 h-3.5 ${settings.tts_wake_lock ? 'text-amber-400' : ''}`} />
+              <span>{settings.tts_wake_lock ? 'Màn hình luôn sáng' : 'Tự tắt màn hình'}</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => updateSettings({ tts_auto_advance: !settings.tts_auto_advance })}
+              className={`flex items-center justify-center gap-1.5 p-2 rounded-xl text-[11px] font-medium border transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+                settings.tts_auto_advance
+                  ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                  : 'bg-slate-800/60 text-slate-400 border-slate-700/50 hover:text-white'
+              }`}
+            >
+              <Radio className={`w-3.5 h-3.5 ${settings.tts_auto_advance ? 'text-sky-400' : ''}`} />
+              <span>{settings.tts_auto_advance ? 'Chạy liên tục các bài' : 'Dừng khi hết bài'}</span>
+            </button>
+          </div>
+
+          {/* Delay Interval between sentences */}
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <span className="text-slate-400 flex items-center gap-1 text-[11px]">
+              <Timer className="w-3.5 h-3.5 text-sky-400" />
+              <span>Nghỉ giữa câu:</span>
+            </span>
+            <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+              {[0, 0.5, 1, 2].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => updateSettings({ tts_sentence_delay: d })}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                    (settings.tts_sentence_delay ?? 0.5) === d
+                      ? 'bg-sky-500 text-slate-950'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {d}s
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Shadowing A-B Repetition Mode */}
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <span className="text-slate-400 flex items-center gap-1 text-[11px]">
+              <Repeat className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Luyện nói Shadowing:</span>
+            </span>
+            <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+              {(['1x', '2x', '3x', 'loop'] as RepeatMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    setRepeatMode(mode);
+                    repeatCountRef.current = 0;
+                  }}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                    repeatMode === mode
+                      ? 'bg-emerald-500 text-slate-950'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={mode === 'loop' ? 'Lặp vô tận' : `Lặp lại câu ${mode}`}
+                >
+                  {mode === 'loop' ? 'Lặp ∞' : mode}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Studio Audio Option */}
+          {hasAudioUrl ? (
             <button
               type="button"
               onClick={() => {
                 handleStop();
-                onClose();
+                onSwitchToStudioAudio?.();
               }}
-              className="p-1 sm:p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Đóng trình phát"
+              className="mt-1 w-full py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
             >
-              <X className="w-4 h-4" />
+              <Headphones className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Chuyển sang Audio Studio (Edge-TTS HD)</span>
             </button>
-          </div>
+          ) : onRequestGenerateTTS ? (
+            <button
+              type="button"
+              disabled={isGeneratingTTS}
+              onClick={onRequestGenerateTTS}
+              className="mt-1 w-full py-2 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 text-[11px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
+            >
+              {isGeneratingTTS ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400" />
+                  <span>Đang tạo bản thu Edge-TTS...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Tạo Edge-TTS Studio (Giọng AI mượt mà)</span>
+                </>
+              )}
+            </button>
+          ) : null}
+        </div>
+      )}
+
+      {/* Primary Floating Capsule Player (Ultra-modern, sleek ~76px) */}
+      <div className="bg-slate-900/95 border border-slate-700/80 rounded-2xl sm:rounded-3xl shadow-2xl backdrop-blur-2xl text-slate-100 overflow-hidden">
+        {/* Progress Bar along the top edge */}
+        <div className="h-1 w-full bg-slate-800">
+          <div
+            className="h-full bg-sky-400 transition-all duration-300 ease-out"
+            style={{
+              width: `${activeSentences.length > 0 ? ((currentIndex + 1) / activeSentences.length) * 100 : 0}%`,
+            }}
+          />
         </div>
 
-        {/* Transition Countdown Banner (Auto-advance to next lesson) */}
-        {transitionCountdown !== null && (
-          <div className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-sky-950/90 via-blue-950/90 to-sky-900/90 border border-sky-500/50 flex items-center justify-between gap-2 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs shrink-0 animate-pulse">
-                {transitionCountdown}s
-              </div>
-              <p className="text-xs text-sky-200 font-medium truncate">
-                Đã đọc xong! Đang chuyển bài tiếp theo...
-              </p>
-            </div>
+        <div className="p-2.5 sm:px-4 sm:py-3 flex flex-col gap-1.5">
+          {/* Active Sentence Row */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md font-mono ${
+                currentSentence?.lang === 'ja-JP'
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  : currentSentence?.lang === 'vi-VN'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+              }`}
+            >
+              {currentSentence?.lang === 'ja-JP' ? '🇯🇵' : currentSentence?.lang === 'vi-VN' ? '🇻🇳' : '🇺🇸'} #{currentIndex + 1}
+            </span>
+
+            <p className="text-xs sm:text-sm font-medium text-slate-100 truncate flex-1 min-w-0">
+              {currentSentence ? currentSentence.text : 'Đang tải bài học...'}
+            </p>
+
+            {onScrollToActiveSentence && (
+              <button
+                type="button"
+                onClick={onScrollToActiveSentence}
+                title="Cuộn tới vị trí câu này trong bài viết"
+                className="shrink-0 p-1 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-slate-800 transition-colors"
+              >
+                <LocateFixed className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Controls & Quick Toggles Row */}
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+            {/* Left: Main Lang, Speed, & Shadowing pills */}
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
+                onClick={cycleMainLang}
+                className="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-[10px] font-bold text-slate-300 border border-slate-700/60 cursor-pointer transition-colors"
+                title="Ngôn ngữ chính (Số & ký hiệu): Bấm để đổi (JA ➡ VI ➡ EN)"
+              >
+                Main: {mainLang === 'ja-JP' ? '🇯🇵' : mainLang === 'vi-VN' ? '🇻🇳' : '🇺🇸'}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
-                  setTransitionCountdown(null);
-                  if (onLessonCompleteRef.current) onLessonCompleteRef.current();
+                  const speeds = [0.8, 1.0, 1.2, 1.5, 1.8];
+                  const nextIdx = (speeds.indexOf(speed) + 1) % speeds.length;
+                  handleSpeedChange(speeds[nextIdx]);
                 }}
-                className="px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-sky-500/20"
+                className="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-[10px] font-mono font-bold text-sky-400 border border-slate-700/60 cursor-pointer transition-colors"
+                title="Tốc độ phát âm: Bấm để đổi"
               >
-                <FastForward className="w-3 h-3" />
-                <span>Chuyển ngay</span>
+                {speed}x
               </button>
+
               <button
                 type="button"
-                onClick={() => setTransitionCountdown(null)}
-                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium cursor-pointer"
+                onClick={() => {
+                  const modes: RepeatMode[] = ['1x', '2x', '3x', 'loop'];
+                  const nextIdx = (modes.indexOf(repeatMode) + 1) % modes.length;
+                  setRepeatMode(modes[nextIdx]);
+                  repeatCountRef.current = 0;
+                }}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer flex items-center gap-1 ${
+                  repeatMode !== '1x'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
+                    : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 border-slate-700/60'
+                }`}
+                title="Chế độ Shadowing: Lặp lại câu (1x, 2x, 3x, hoặc Vô tận ∞) để luyện nhại giọng"
               >
-                Dừng lại
+                <Repeat className={`w-3 h-3 ${repeatMode !== '1x' ? 'text-emerald-400' : 'text-slate-400'}`} />
+                <span>{repeatMode === 'loop' ? 'Loop ∞' : `${repeatMode}`}</span>
               </button>
             </div>
-          </div>
-        )}
 
-        {/* Live Active Sentence Display */}
-        <div className="p-2 sm:p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 min-h-[46px] flex flex-col justify-center">
-          {currentSentence ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className={`px-1.5 py-0.2 rounded-md font-mono text-[9px] font-bold ${
-                      currentSentence.lang === 'ja-JP'
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                        : currentSentence.lang === 'vi-VN'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                    }`}
-                  >
-                    {currentSentence.lang === 'ja-JP'
-                      ? '🇯🇵 Japanese'
-                      : currentSentence.lang === 'vi-VN'
-                      ? '🇻🇳 Vietnamese'
-                      : '🇺🇸 English'}
-                  </span>
-                  <span>
-                    #{currentIndex + 1} / {activeSentences.length}
-                  </span>
-                </span>
-                <span className="text-[9px] text-slate-500">
-                  {isPlaying ? 'Speaking...' : isPaused ? 'Paused' : 'Ready'}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-100 font-medium leading-relaxed line-clamp-2">
-                {currentSentence.text}
-              </p>
-            </div>
-          ) : (
-            <div className="text-center text-xs text-slate-500 py-1">
-              No speech sentences found in this article.
-            </div>
-          )}
-        </div>
+            {/* Center: Playback Controls */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={currentIndex <= 0}
+                className="p-1.5 rounded-full text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 cursor-pointer transition-colors active:scale-95"
+                title="Câu trước"
+              >
+                <SkipBack className="w-4 h-4" />
+              </button>
 
-        {/* Smart Modes & Options Bar (Screen Wake Lock & Continuous Audio Machine) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
-          <div className="flex items-center gap-2">
-            {/* Screen Wake Lock Toggle */}
-            <button
-              type="button"
-              onClick={() => updateSettings({ tts_wake_lock: !settings.tts_wake_lock })}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all cursor-pointer ${
-                settings.tts_wake_lock
-                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-xs shadow-amber-500/10'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-white border border-slate-700/50'
-              }`}
-              title={
-                settings.tts_wake_lock
-                  ? 'Màn hình luôn bật sáng khi đọc trên di động'
-                  : 'Tự tắt màn hình theo cài đặt tiết kiệm pin của máy'
-              }
-            >
-              <Sun
-                className={`w-3.5 h-3.5 ${
-                  settings.tts_wake_lock && isPlaying ? 'text-amber-400' : ''
-                }`}
-              />
-              <span>{settings.tts_wake_lock ? 'Giữ màn hình sáng' : 'Tự tắt MH'}</span>
-              {isWakeLocked && (
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping ml-0.5" />
+              {isPlaying ? (
+                <button
+                  type="button"
+                  onClick={handlePause}
+                  className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer transition-transform"
+                  title="Tạm dừng"
+                >
+                  <Pause className="w-4 h-4 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePlay}
+                  disabled={activeSentences.length === 0}
+                  className="w-9 h-9 rounded-full bg-sky-500 hover:bg-sky-400 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-sky-500/20 active:scale-95 cursor-pointer transition-transform disabled:opacity-40"
+                  title="Phát tiếp"
+                >
+                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                </button>
               )}
-            </button>
 
-            {/* Continuous Audio Machine Toggle */}
-            <button
-              type="button"
-              onClick={() => updateSettings({ tts_auto_advance: !settings.tts_auto_advance })}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all cursor-pointer ${
-                settings.tts_auto_advance
-                  ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30 shadow-xs shadow-sky-500/20'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-white border border-slate-700/50'
-              }`}
-              title={
-                settings.tts_auto_advance
-                  ? 'Tự động nhảy sang bài/chương tiếp theo khi đọc xong (Máy audio chạy liên tục)'
-                  : 'Chỉ đọc hết bài hiện tại rồi dừng lại'
-              }
-            >
-              <Radio
-                className={`w-3.5 h-3.5 ${
-                  settings.tts_auto_advance ? 'text-sky-400 animate-pulse' : ''
-                }`}
-              />
-              <span>{settings.tts_auto_advance ? 'Máy audio (Chạy liên tục)' : 'Đọc 1 bài'}</span>
-            </button>
-          </div>
-
-          <div className="text-[10px] text-slate-400 font-mono hidden sm:inline">
-            {hasNextLesson ? '● Có bài kế tiếp' : '■ Đã đến bài cuối'}
-          </div>
-        </div>
-
-        {/* Timing & Delay Controls (Sentence Interval & Next Lesson Countdown) */}
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-1.5 px-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 text-[11px]">
-          {/* Sentence Delay (Nghỉ giữa các câu) */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="flex items-center gap-1 text-slate-300 font-medium shrink-0">
-              <Timer className="w-3.5 h-3.5 text-sky-400" />
-              <span>Nghỉ câu:</span>
-            </span>
-            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-950/80 p-0.5 rounded-lg border border-slate-800">
-              {[
-                { val: 0, label: '0s' },
-                { val: 0.5, label: '0.5s' },
-                { val: 1, label: '1s' },
-                { val: 2, label: '2s' },
-                { val: 3, label: '3s' }
-              ].map((item) => {
-                const isActive = (settings.tts_sentence_delay ?? 0.5) === item.val;
-                return (
-                  <button
-                    key={item.val}
-                    type="button"
-                    onClick={() => updateSettings({ tts_sentence_delay: item.val })}
-                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-sky-500 text-slate-950 shadow-xs shadow-sky-500/30'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                    }`}
-                    title={`Nghỉ ${item.label} trước khi đọc câu tiếp theo`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={currentIndex >= activeSentences.length - 1}
+                className="p-1.5 rounded-full text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 cursor-pointer transition-colors active:scale-95"
+                title="Câu tiếp theo"
+              >
+                <SkipForward className="w-4 h-4" />
+              </button>
             </div>
-          </div>
 
-          {/* Next Lesson Delay (Thời gian chờ sang bài tiếp theo) */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="flex items-center gap-1 text-slate-300 font-medium shrink-0">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Chờ sang bài:</span>
-            </span>
-            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-950/80 p-0.5 rounded-lg border border-slate-800">
-              {[
-                { val: 1, label: '1s' },
-                { val: 2, label: '2s' },
-                { val: 3, label: '3s' },
-                { val: 5, label: '5s' }
-              ].map((item) => {
-                const isActive = (settings.tts_lesson_delay ?? 2) === item.val;
-                return (
-                  <button
-                    key={item.val}
-                    type="button"
-                    onClick={() => updateSettings({ tts_lesson_delay: item.val })}
-                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-cyan-500 text-slate-950 shadow-xs shadow-cyan-500/30'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                    }`}
-                    title={`Đếm ngược ${item.label} trước khi tự chuyển sang bài tiếp theo`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Playback Controls & Speed */}
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
-          {/* Main Buttons */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={currentIndex <= 0}
-              className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
-              title="Previous Sentence"
-            >
-              <SkipBack className="w-4 h-4" />
-            </button>
-
-            {isPlaying ? (
+            {/* Right: Settings, Minimize, Close */}
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                onClick={handlePause}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
-                title="Pause"
-              >
-                <Pause className="w-4 h-4 fill-current" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handlePlay}
-                disabled={activeSentences.length === 0}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold shadow-lg shadow-sky-600/30 transition-all cursor-pointer disabled:opacity-40"
-                title="Play Audio"
-              >
-                <Play className="w-4 h-4 fill-current ml-0.5" />
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={currentIndex >= activeSentences.length - 1}
-              className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
-              title="Next Sentence"
-            >
-              <SkipForward className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleStop}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Stop"
-            >
-              <Square className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Speed Selector */}
-          <div className="flex items-center gap-1 bg-slate-800/80 p-0.5 rounded-xl text-[10px] font-bold">
-            <span className="text-slate-400 px-1 text-[9px] uppercase hidden xs:inline">Speed:</span>
-            {[0.8, 1.0, 1.25, 1.5].map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => handleSpeedChange(s)}
-                className={`px-1.5 sm:px-2 py-0.5 rounded-lg transition-colors cursor-pointer ${
-                  speed === s ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                  isSettingsOpen
+                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800 border-transparent'
                 }`}
+                title="Cài đặt phát âm, nghỉ giữa câu & chế độ"
               >
-                {s}x
+                <Settings className="w-4 h-4" />
               </button>
-            ))}
+
+              <button
+                type="button"
+                onClick={() => setIsCollapsed(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Thu nhỏ thanh phát"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleStop();
+                  onClose();
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Đóng trình phát"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

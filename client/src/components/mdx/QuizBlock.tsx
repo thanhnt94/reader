@@ -109,10 +109,20 @@ export const QuizBlock: React.FC<QuizBlockProps> = ({
 
       {submitted && (
         <div className={`p-3.5 rounded-xl border text-xs leading-relaxed ${isCorrect ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
-          <div className="font-semibold mb-1 flex items-center gap-1.5">
-            {isCorrect ? '🎉 Correct Answer!' : '❌ Incorrect!'}
+          <div className="font-semibold mb-1 flex items-center justify-between gap-1.5">
+            <span>{isCorrect ? '🎉 Chính xác!' : '❌ Chưa chính xác!'}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setSubmitted(false);
+                setSelectedOption(null);
+              }}
+              className="text-[11px] font-normal text-slate-400 hover:text-white underline cursor-pointer"
+            >
+              Làm lại ↺
+            </button>
           </div>
-          {explanation && <p className="text-slate-300">{explanation}</p>}
+          {explanation && <p className="text-slate-300 mt-1">{explanation}</p>}
         </div>
       )}
     </div>

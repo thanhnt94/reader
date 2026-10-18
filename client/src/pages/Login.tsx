@@ -35,9 +35,10 @@ export default function Login() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      navigate('/');
+      const redirect = searchParams.get('redirect') || '/';
+      navigate(redirect);
     }
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn, navigate, searchParams]);
 
   // Load SSO config when opening settings
   const loadSSOConfig = async () => {
@@ -96,9 +97,16 @@ export default function Login() {
   // Automatic SSO redirection if enabled and not backdoor
   useEffect(() => {
     if (authConfig && authConfig.sso_enabled && !isBackdoor && !urlError && authConfig.jump_url) {
-      window.location.href = authConfig.jump_url;
+      const redirect = searchParams.get('redirect');
+      if (redirect) {
+        document.cookie = `sso_return_url=${encodeURIComponent(redirect)}; path=/; max-age=600; SameSite=Lax`;
+        const delimiter = authConfig.jump_url.includes('?') ? '&' : '?';
+        window.location.href = `${authConfig.jump_url}${delimiter}state=${encodeURIComponent(redirect)}`;
+      } else {
+        window.location.href = authConfig.jump_url;
+      }
     }
-  }, [authConfig, isBackdoor, urlError]);
+  }, [authConfig, isBackdoor, urlError, searchParams]);
 
   useEffect(() => {
     if (urlError) {
@@ -133,7 +141,8 @@ export default function Login() {
     setIsSubmitting(false);
 
     if (res.success) {
-      navigate('/');
+      const redirect = searchParams.get('redirect') || '/';
+      navigate(redirect);
     } else {
       setErrorMsg(res.error || 'Invalid credentials');
     }
@@ -141,7 +150,14 @@ export default function Login() {
 
   const handleSSORedirect = () => {
     if (authConfig?.jump_url) {
-      window.location.href = authConfig.jump_url;
+      const redirect = searchParams.get('redirect');
+      if (redirect) {
+        document.cookie = `sso_return_url=${encodeURIComponent(redirect)}; path=/; max-age=600; SameSite=Lax`;
+        const delimiter = authConfig.jump_url.includes('?') ? '&' : '?';
+        window.location.href = `${authConfig.jump_url}${delimiter}state=${encodeURIComponent(redirect)}`;
+      } else {
+        window.location.href = authConfig.jump_url;
+      }
     } else {
       setErrorMsg('SSO Jump URL not configured or service unavailable.');
     }

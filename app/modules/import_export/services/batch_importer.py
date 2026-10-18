@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from app.modules.course.models import Course, Chapter, Lesson
 from app.modules.tts.services.tts_service import TTSService
+from app.modules.editor.services.repair_service import RepairService
 
 class BatchImporter:
 
@@ -136,6 +137,10 @@ class BatchImporter:
                         raw_content = f.read()
 
                     meta, remaining = cls.parse_frontmatter(raw_content)
+                    # Self-heal and sanitize markdown syntax automatically
+                    repaired = RepairService.fix_markdown(remaining)
+                    remaining = repaired.get("fixed_markdown", remaining)
+                    raw_content = remaining
                     fallback_title = os.path.splitext(fname)[0]
                     les_title = meta.get("title") or cls.extract_title(remaining, fallback_title)
                     les_slug = f"{chapter.slug}-{cls.slugify(fallback_title)}"
@@ -188,6 +193,10 @@ class BatchImporter:
                     raw_content = f.read()
 
                 meta, remaining = cls.parse_frontmatter(raw_content)
+                # Self-heal and sanitize markdown syntax automatically
+                repaired = RepairService.fix_markdown(remaining)
+                remaining = repaired.get("fixed_markdown", remaining)
+                raw_content = remaining
                 fallback_title = os.path.splitext(fname)[0]
                 les_title = meta.get("title") or cls.extract_title(remaining, fallback_title)
                 les_slug = f"{chapter.slug}-{cls.slugify(fallback_title[:50])}"

@@ -22,6 +22,7 @@ import { readerApi, Course } from '../lib/api/readerApi';
 import { useAppStore } from '../store/useAppStore';
 import { CreateCourseModal } from '../components/course/CreateCourseModal';
 import { CourseManagerModal } from '../components/course/CourseManagerModal';
+import { UserNavMenu } from '../components/common/UserNavMenu';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -220,36 +221,8 @@ export default function Dashboard() {
             </button>
           )}
 
-          {isLoggedIn ? (
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
-              <div className="flex items-center gap-2 text-xs">
-                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
-                  <UserIcon className="w-4 h-4" />
-                </div>
-                <div className="hidden md:block text-left">
-                  <div className="font-semibold text-white leading-tight">{user?.username}</div>
-                  <div className="text-[10px] text-sky-400 capitalize">{user?.role}</div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={logout}
-                title="Sign Out"
-                className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-colors"
-            >
-              Sign In
-            </button>
-          )}
+          <div className="h-5 w-px bg-slate-800 mx-1 hidden sm:block" />
+          <UserNavMenu compactOnMobile={false} />
         </div>
       </header>
 

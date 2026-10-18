@@ -1,6 +1,28 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.db import Base
+
+AUDIO_SLOT_PRESETS = [
+    {
+        "slot_num": 1,
+        "mode_key": "slot_1",
+        "title": "Slot 1",
+        "description": "Kịch bản âm thanh Slot 1"
+    },
+    {
+        "slot_num": 2,
+        "mode_key": "slot_2",
+        "title": "Slot 2",
+        "description": "Kịch bản âm thanh Slot 2"
+    },
+    {
+        "slot_num": 3,
+        "mode_key": "slot_3",
+        "title": "Slot 3",
+        "description": "Kịch bản âm thanh Slot 3"
+    }
+]
 
 class Course(Base):
     __tablename__ = "courses"
@@ -68,6 +90,9 @@ class Lesson(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Relationships
+    audio_tracks = relationship("LessonAudioTrack", back_populates="lesson", cascade="all, delete-orphan", order_by="LessonAudioTrack.slot_num", lazy="selectin")
+
     def to_dict(self, include_content=False):
         data = {
             "id": self.id,
@@ -87,7 +112,51 @@ class Lesson(Base):
         }
         if include_content:
             data["raw_markdown"] = self.raw_markdown
+        try:
+            tracks = getattr(self, "audio_tracks", None)
+            if tracks is not None:
+                data["audio_tracks"] = [t.to_dict() for t in tracks]
+        except Exception:
+            pass
         return data
+
+class LessonAudioTrack(Base):
+    __tablename__ = "lesson_audio_tracks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True)
+    slot_num = Column(Integer, default=1, nullable=False, index=True)  # 1, 2, 3
+    mode_key = Column(String(50), nullable=False, default="bilingual_interleaved")
+    title = Column(String(150), nullable=False, default="Slot 1")
+    description = Column(String(255), nullable=True)
+    audio_script = Column(Text, nullable=True, default="")
+    audio_url = Column(String(500), nullable=True)
+    duration_seconds = Column(Float, default=0.0)
+    tts_provider = Column(String(50), default="edge-tts")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    lesson = relationship("Lesson", back_populates="audio_tracks")
+
+    __table_args__ = (
+        UniqueConstraint("lesson_id", "slot_num", name="uq_lesson_audio_slot"),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "lesson_id": self.lesson_id,
+            "slot_num": self.slot_num,
+            "mode_key": self.mode_key,
+            "title": self.title,
+            "description": self.description,
+            "audio_script": self.audio_script or "",
+            "audio_url": self.audio_url,
+            "duration_seconds": self.duration_seconds,
+            "tts_provider": self.tts_provider,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
 
 class UserReadProgress(Base):
     __tablename__ = "user_read_progress"
@@ -98,6 +167,7 @@ class UserReadProgress(Base):
     is_completed = Column(Boolean, default=False)
     last_scroll_pos = Column(Float, default=0.0)
     last_audio_pos = Column(Float, default=0.0)
+    completed_sections = Column(JSON, default=list, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
@@ -108,6 +178,7 @@ class UserReadProgress(Base):
             "is_completed": self.is_completed,
             "last_scroll_pos": self.last_scroll_pos,
             "last_audio_pos": self.last_audio_pos,
+            "completed_sections": self.completed_sections or [],
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
 

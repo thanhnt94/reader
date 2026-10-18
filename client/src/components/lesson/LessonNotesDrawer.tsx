@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   X,
   BookOpen,
-  Save,
   CheckCircle2,
   AlertCircle,
   FileText,
-  Sparkles,
   Copy,
   Trash2,
-  Clock
+  Clock,
+  LogIn,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Sparkles
 } from 'lucide-react';
-import { readerApi, UserLessonNote } from '../../lib/api/readerApi';
+import { readerApi } from '../../lib/api/readerApi';
+import { useAppStore } from '../../store/useAppStore';
 
 interface LessonNotesDrawerProps {
   lessonId: number;
@@ -26,17 +31,22 @@ export const LessonNotesDrawer: React.FC<LessonNotesDrawerProps> = ({
   isOpen,
   onClose,
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, isLoggedIn } = useAppStore();
+
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load note on mount / when lessonId changes
+  // Load note only when authenticated and drawer is open
   useEffect(() => {
-    if (!isOpen || !lessonId) return;
+    if (!isOpen || !lessonId || !isLoggedIn) return;
 
     setIsLoading(true);
     readerApi
@@ -54,11 +64,17 @@ export const LessonNotesDrawer: React.FC<LessonNotesDrawerProps> = ({
       .finally(() => {
         setIsLoading(false);
       });
-  }, [isOpen, lessonId]);
+  }, [isOpen, lessonId, isLoggedIn]);
+
+  const handleNavigateToLogin = () => {
+    const currentPath = location.pathname + location.search;
+    navigate(`/login?redirect=${encodeURIComponent(currentPath)}`);
+  };
 
   // Auto-save logic (Debounce 1.2s)
   const handleContentChange = (val: string) => {
     setContent(val);
+    if (!isLoggedIn) return;
 
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -70,13 +86,13 @@ export const LessonNotesDrawer: React.FC<LessonNotesDrawerProps> = ({
   };
 
   const saveNote = async (textToSave: string) => {
-    if (!lessonId) return;
+    if (!lessonId || !isLoggedIn) return;
     setIsSaving(true);
     try {
-      const saved = await readerApi.saveUserLessonNote(lessonId, textToSave);
+      await readerApi.saveUserLessonNote(lessonId, textToSave);
       const now = new Date();
       setLastSavedTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      setStatusMsg({ type: 'success', text: 'Đã tự động lưu' });
+      setStatusMsg({ type: 'success', text: 'Đã tự động lưu lên đám mây' });
     } catch (e: any) {
       setStatusMsg({ type: 'error', text: 'Lưu thất bại' });
     } finally {
@@ -101,6 +117,9 @@ export const LessonNotesDrawer: React.FC<LessonNotesDrawerProps> = ({
 
   if (!isOpen) return null;
 
+  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const charCount = content.length;
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden font-sans">
       {/* Backdrop */}
@@ -109,116 +128,145 @@ export const LessonNotesDrawer: React.FC<LessonNotesDrawerProps> = ({
         className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
       />
 
-      {/* Slide-over Panel */}
       <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-[#0b1120] border-l border-sky-900/40 text-slate-100 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+        <div
+          className={`h-full bg-[#0b1120] border-l border-sky-900/40 shadow-2xl flex flex-col transition-all duration-300 animate-in slide-in-from-right ${
+            isExpanded ? 'w-screen max-w-3xl' : 'w-screen max-w-md'
+          }`}
+        >
           {/* Header */}
-          <div className="px-5 py-4 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between gap-3 shrink-0">
+          <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
                 <FileText className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <h3 className="font-bold text-sm text-white truncate">Sổ Tay Cá Nhân</h3>
-                <p className="text-[11px] text-slate-400 truncate max-w-[220px]">{lessonTitle}</p>
+                <h3 className="font-bold text-sm text-white truncate">Sổ Tay Ghi Chú Cá Nhân</h3>
+                <p className="text-[11px] text-slate-400 truncate max-w-[200px] sm:max-w-xs">
+                  {lessonTitle}
+                </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {content && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleCopy}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                    title="Sao chép nội dung"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
-                    title="Xóa ghi chú"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </>
-              )}
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors hidden sm:block cursor-pointer"
+                title={isExpanded ? 'Thu gọn' : 'Phóng to'}
+              >
+                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-1"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Đóng"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Sub Status Bar */}
-          <div className="px-5 py-2 bg-slate-950/60 border-b border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 shrink-0 font-mono">
-            <div className="flex items-center gap-1.5">
-              {isSaving ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
-                  <span className="text-sky-300">Đang lưu...</span>
-                </>
-              ) : lastSavedTime ? (
-                <>
-                  <Clock className="w-3 h-3 text-slate-500" />
-                  <span>Đã lưu lúc {lastSavedTime}</span>
-                </>
-              ) : (
-                <span>Tự động lưu khi gõ</span>
+          {/* Body Content */}
+          {!isLoggedIn ? (
+            /* ======================================================== */
+            /* AUTH WALL: Login Prompt for Guests                       */
+            /* ======================================================== */
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+              <div className="w-16 h-16 rounded-3xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mb-4 shadow-lg shadow-sky-500/10">
+                <FileText className="w-8 h-8" />
+              </div>
+              <h4 className="text-base font-bold text-white mb-2">Đồng Bộ Ghi Chú Trên Đám Mây</h4>
+              <p className="text-xs text-slate-400 max-w-xs mb-6 leading-relaxed">
+                Sổ tay ghi chú cá nhân được lưu trữ bảo mật và đồng bộ tức thì theo tài khoản InMind của bạn trên mọi thiết bị.
+              </p>
+              <button
+                type="button"
+                onClick={handleNavigateToLogin}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-sky-500/25 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <LogIn className="w-4 h-4 stroke-[2.5]" />
+                <span>Đăng nhập để ghi chép</span>
+              </button>
+            </div>
+          ) : isLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2">
+              <Loader2 className="w-6 h-6 animate-spin text-sky-400" />
+              <span className="text-xs">Đang tải ghi chú...</span>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col p-4 sm:p-5 overflow-hidden">
+              {/* Textarea container */}
+              <div className="flex-1 relative flex flex-col">
+                <textarea
+                  value={content}
+                  onChange={(e) => handleContentChange(e.target.value)}
+                  placeholder="Ghi chú kiến thức quan trọng, từ vựng mới hoặc suy nghĩ của bạn về bài học này..."
+                  className="flex-1 w-full bg-slate-900/60 border border-slate-800 focus:border-sky-500/60 rounded-2xl p-4 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none leading-relaxed font-sans transition-colors"
+                />
+              </div>
+
+              {/* Status and Action Bar */}
+              <div className="mt-3 flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/80">
+                <div className="flex items-center gap-2 text-[11px]">
+                  {isSaving ? (
+                    <span className="flex items-center gap-1.5 text-sky-400 font-medium">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Đang lưu...
+                    </span>
+                  ) : lastSavedTime ? (
+                    <span className="flex items-center gap-1 text-slate-400">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      Đã lưu lúc {lastSavedTime}
+                    </span>
+                  ) : (
+                    <span>Tự động lưu khi gõ</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-slate-400 px-2 font-mono">
+                    {wordCount} từ · {charCount} ký tự
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    disabled={!content.trim()}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
+                    title="Sao chép toàn bộ"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    disabled={!content.trim()}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
+                    title="Xóa ghi chú"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Toast */}
+              {statusMsg && (
+                <div
+                  className={`mt-2 p-2 rounded-xl text-center text-xs font-medium animate-in fade-in duration-200 ${
+                    statusMsg.type === 'success'
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                  }`}
+                >
+                  {statusMsg.text}
+                </div>
               )}
             </div>
-
-            {statusMsg && (
-              <span
-                className={`text-[10px] font-bold ${
-                  statusMsg.type === 'success' ? 'text-sky-400' : 'text-rose-400'
-                }`}
-              >
-                {statusMsg.text}
-              </span>
-            )}
-          </div>
-
-          {/* Text Editor Area */}
-          <div className="flex-1 flex flex-col p-4 bg-[#070a13]">
-            {isLoading ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2">
-                <div className="w-6 h-6 border-2 border-sky-500/20 border-t-sky-400 rounded-full animate-spin" />
-                <span className="text-xs">Đang tải ghi chú...</span>
-              </div>
-            ) : (
-              <textarea
-                value={content}
-                onChange={(e) => handleContentChange(e.target.value)}
-                placeholder="Viết ghi chú của bạn cho bài học này...
-- Từ vựng mới
-- Ngữ pháp cần chú ý
-- Ý tưởng phản xạ speaking 45s
-(Hệ thống tự động lưu vào tài khoản của bạn)"
-                className="flex-1 w-full p-3 bg-transparent text-slate-200 text-xs sm:text-sm leading-relaxed resize-none focus:outline-none placeholder-slate-600 font-sans selection:bg-sky-500/30 selection:text-white"
-                spellCheck={false}
-              />
-            )}
-          </div>
-
-          {/* Footer Info */}
-          <div className="p-3 border-t border-slate-800 bg-slate-900/90 text-[11px] text-slate-400 flex items-center justify-between shrink-0">
-            <span>{content.length} ký tự</span>
-            <button
-              type="button"
-              onClick={() => saveNote(content)}
-              disabled={isSaving}
-              className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md shadow-sky-600/20 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer disabled:opacity-50"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>Lưu ngay</span>
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

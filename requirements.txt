@@ -10,3 +10,5 @@ python-multipart>=0.0.9
 edge-tts>=6.1.10
 pyyaml>=6.0.1
 pydub>=0.25.1
+pykakasi>=2.3.0
+jaconv>=0.3.4

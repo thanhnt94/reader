@@ -25,6 +25,7 @@ import {
 import { readerApi, Course, Chapter, Lesson } from '../lib/api/readerApi';
 import { useAppStore } from '../store/useAppStore';
 import { CourseManagerModal } from '../components/course/CourseManagerModal';
+import { UserNavMenu } from '../components/common/UserNavMenu';
 
 export default function CourseDashboard() {
   const { courseSlugOrId } = useParams<{ courseSlugOrId: string }>();
@@ -97,35 +98,6 @@ export default function CourseDashboard() {
     const uncompleted = allLessons.find((l) => !l.progress?.is_completed);
     return uncompleted || allLessons[0];
   }, [allLessons]);
-
-  // JSST Syllabus Question Completeness Analysis (from 1 to 87)
-  const missingAnalysis = useMemo(() => {
-    if (!course || course.slug !== 'jsst') return null;
-
-    const foundNums = new Set<number>();
-    allLessons.forEach((l) => {
-      const matchTitle = l.title.match(/Câu\s*(\d+)/i);
-      const matchSlug = l.slug.match(/-o(\d+)-/);
-      if (matchTitle) {
-        foundNums.add(parseInt(matchTitle[1], 10));
-      } else if (matchSlug) {
-        foundNums.add(parseInt(matchSlug[1], 10));
-      } else {
-        const fallback = l.title.match(/\b\d+\b/) || l.slug.match(/\d+/g);
-        if (fallback) {
-          foundNums.add(parseInt(fallback[0], 10));
-        }
-      }
-    });
-
-    const expected = Array.from({ length: 87 }, (_, i) => i + 1);
-    const missing = expected.filter((num) => !foundNums.has(num));
-    return {
-      totalExpected: 87,
-      totalPresent: foundNums.size,
-      missingList: missing
-    };
-  }, [course, allLessons]);
 
   // Toggle chapter accordion
   const toggleChapter = (chapterId: number) => {
@@ -268,6 +240,9 @@ export default function CourseDashboard() {
               <span>{completedLessons === 0 ? 'Start Learning' : 'Continue'}</span>
             </Link>
           )}
+
+          <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
+          <UserNavMenu />
         </div>
       </header>
 
@@ -364,68 +339,6 @@ export default function CourseDashboard() {
             </div>
           </div>
         </section>
-
-        {/* Full Syllabus Complete Banner */}
-        {missingAnalysis && missingAnalysis.missingList.length === 0 && (
-          <section className="rounded-2xl bg-sky-500/10 border border-sky-500/30 p-4 backdrop-blur-md flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold">
-                <Check className="w-4 h-4 stroke-[3]" />
-              </div>
-              <div>
-                <h3 className="text-xs sm:text-sm font-bold text-sky-300">
-                  Full Syllabus Active (87 / 87 Questions)
-                </h3>
-                <p className="text-[11px] text-sky-400/80">
-                  All 87 Japanese Speaking Skill Test questions are synchronized and ready to study.
-                </p>
-              </div>
-            </div>
-            <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold font-mono">
-              100% Complete
-            </span>
-          </section>
-        )}
-
-        {/* Missing Questions Notification (For JSST Course) */}
-        {missingAnalysis && missingAnalysis.missingList.length > 0 && (
-          <section className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-5 backdrop-blur-md">
-            <div className="flex items-start gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0 font-bold">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-sm font-bold text-amber-300">
-                    Missing Syllabus Questions ({missingAnalysis.totalPresent} / {missingAnalysis.totalExpected} questions)
-                  </h3>
-                  {user?.role === 'admin' && (
-                    <button
-                      type="button"
-                      onClick={() => setIsManagerModalOpen(true)}
-                      className="text-xs font-bold text-amber-300 hover:text-white underline cursor-pointer"
-                    >
-                      Open Course Studio to Upload &rarr;
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs text-amber-200/80 leading-relaxed">
-                  Currently missing <strong>{missingAnalysis.missingList.length} questions</strong> from the 1–87 sequence:
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {missingAnalysis.missingList.map((num) => (
-                    <span
-                      key={num}
-                      className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-mono font-bold"
-                    >
-                      Câu {String(num).padStart(2, '0')}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
 
         {/* Syllabus Controls (Search, Filters, Accordion toggles) */}
         <section className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">

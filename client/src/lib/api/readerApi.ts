@@ -26,6 +26,20 @@ export interface LessonProgress {
   is_completed: boolean;
   last_scroll_pos: number;
   last_audio_pos: number;
+  completed_sections?: string[];
+}
+
+export interface AudioTrack {
+  id?: number | null;
+  lesson_id?: number;
+  slot_num: number;
+  mode_key: string;
+  title: string;
+  description?: string;
+  audio_script?: string;
+  audio_url?: string | null;
+  duration_seconds: number;
+  tts_provider?: string;
 }
 
 export interface Lesson {
@@ -42,6 +56,7 @@ export interface Lesson {
   tts_generated: boolean;
   frontmatter_data?: Record<string, any> | null;
   toc_data?: TOCItem[] | null;
+  audio_tracks?: AudioTrack[];
   chapter?: { id: number; title: string; course_id: number };
   course?: { id: number; title: string };
   progress?: LessonProgress | null;
@@ -80,6 +95,7 @@ export interface UserSettings {
   tts_auto_advance?: boolean;
   tts_sentence_delay?: number;
   tts_lesson_delay?: number;
+  show_furigana?: boolean;
 }
 
 export interface LessonComment {
@@ -209,8 +225,44 @@ export const readerApi = {
     const res = await apiClient.post(`/api/v1/lessons/${lessonId}/progress`, data);
     return res.data;
   },
-  generateTTS: async (lessonId: number) => {
-    const res = await apiClient.post(`/api/v1/lessons/${lessonId}/generate-tts`);
+  updateAudioTrack: async (
+    lessonId: number,
+    slotNum: number,
+    data: { title?: string; description?: string; audio_script?: string }
+  ): Promise<AudioTrack> => {
+    const res = await apiClient.put(`/api/v1/lessons/${lessonId}/audio-tracks/${slotNum}`, data);
+    return res.data;
+  },
+  deleteAudioTrackFile: async (
+    lessonId: number,
+    slotNum: number
+  ): Promise<any> => {
+    const res = await apiClient.delete(`/api/v1/lessons/${lessonId}/audio-tracks/${slotNum}/audio`);
+    return res.data;
+  },
+  generateTTS: async (
+    lessonIdOrSlug: number | string,
+    slotOrOptions: number | { slot_num?: number; slot?: number; force?: boolean; audio_script?: string } = 1,
+    force: boolean = false,
+    audio_script?: string
+  ): Promise<{ status: string; slot_num?: number; audio_url?: string; duration_seconds?: number; audio_tracks?: AudioTrack[]; message?: string }> => {
+    let slot = 1;
+    let isForce = force;
+    let script = audio_script;
+
+    if (typeof slotOrOptions === 'object' && slotOrOptions !== null) {
+      slot = slotOrOptions.slot_num ?? slotOrOptions.slot ?? 1;
+      isForce = slotOrOptions.force ?? false;
+      script = slotOrOptions.audio_script;
+    } else if (typeof slotOrOptions === 'number') {
+      slot = slotOrOptions;
+    }
+
+    const res = await apiClient.post(`/api/v1/lessons/${lessonIdOrSlug}/generate-tts`, {
+      slot,
+      force: isForce,
+      audio_script: script,
+    });
     return res.data;
   },
 
@@ -265,4 +317,49 @@ export const readerApi = {
     const res = await apiClient.put(`/api/v1/lessons/${lessonId}/note`, { content });
     return res.data;
   },
+
+  // WYSIWYG Editor Intelligent Tools
+  autoGenerateFurigana: async (text: string): Promise<{ converted_text: string; kanji_count: number; ruby_added: number }> => {
+    const res = await apiClient.post('/api/v1/editor/auto-furigana', { text });
+    return res.data;
+  },
+  autoFixMarkdown: async (markdown: string): Promise<{ fixed_markdown: string; issues_fixed: string[]; changes_count: number }> => {
+    const res = await apiClient.post('/api/v1/editor/auto-fix', { markdown });
+    return res.data;
+  },
+  lintMarkdown: async (markdown: string): Promise<{
+    score: number;
+    status: string;
+    issues: Array<{ level: string; message: string }>;
+    stats: { headings: number; ruby_count: number; word_count: number; char_count: number };
+  }> => {
+    const res = await apiClient.post('/api/v1/editor/lint', { markdown });
+    return res.data;
+  },
+  smartConvertNotes: async (rawText: string, autoFurigana: boolean = true): Promise<{
+    title: string;
+    markdown: string;
+    suggested_tags: string[];
+  }> => {
+    const res = await apiClient.post('/api/v1/editor/smart-convert', { raw_text: rawText, auto_furigana: autoFurigana });
+    return res.data;
+  },
+  saveVocaburnCard: async (data: {
+    front: string;
+    back?: string;
+    reading?: string;
+    context?: string;
+    lesson_title?: string;
+  }): Promise<{
+    success: boolean;
+    card_id: number;
+    deck_id: number;
+    deck_title: string;
+    action: string;
+    message: string;
+  }> => {
+    const res = await apiClient.post('/api/v1/editor/vocaburn/save-card', data);
+    return res.data;
+  },
 };
+

@@ -18,6 +18,7 @@ from app.modules.auth.routes.auth_routes import router as auth_router
 from app.modules.course.routes.course_routes import router as course_router
 from app.modules.import_export.routes.import_routes import router as import_router
 from app.modules.settings.routes import router as settings_router
+from app.modules.editor.routes import router as editor_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -85,6 +86,7 @@ app.include_router(auth_router)
 app.include_router(course_router)
 app.include_router(import_router)
 app.include_router(settings_router)
+app.include_router(editor_router)
 
 # SPA Fallback Handlers
 @app.get("/")

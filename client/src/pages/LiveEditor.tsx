@@ -33,15 +33,31 @@ import {
   FileCode,
   Layers,
   FileText,
-  RotateCcw
+  RotateCcw,
+  ShieldAlert,
+  Wand2,
+  ClipboardPaste,
+  Calculator,
+  GitFork,
+  CreditCard,
+  Loader2,
+  AlertTriangle,
+  RefreshCw,
+  Headphones,
+  Trash2,
+  Volume2,
+  Copy,
 } from 'lucide-react';
-import { readerApi, Lesson, Chapter, Course } from '../lib/api/readerApi';
+import { readerApi, Lesson, Chapter, Course, AudioTrack } from '../lib/api/readerApi';
 import { MarkdownRenderer } from '../components/mdx/MarkdownRenderer';
 import { htmlToMarkdown, markdownToHtml } from '../lib/utils/markdownConverter';
+import { useAppStore } from '../store/useAppStore';
+import { detectLanguage } from '../components/player/BrowserSpeechPlayer';
 
 export default function LiveEditor() {
   const { lessonId } = useParams<{ lessonId?: string }>();
   const navigate = useNavigate();
+  const { user, isLoggedIn, isLoading: isAuthLoading } = useAppStore();
 
   // Courses & Chapters State
   const [courses, setCourses] = useState<Course[]>([]);
@@ -56,6 +72,15 @@ export default function LiveEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // 4 Primary Editor Pages/Tabs: 'content' (Bài học chính) | 'slot1' | 'slot2' | 'slot3'
+  const [editorMainTab, setEditorMainTab] = useState<'content' | 'slot1' | 'slot2' | 'slot3'>('content');
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([
+    { slot_num: 1, mode_key: 'slot_1', title: 'Slot 1', description: '', audio_script: '', duration_seconds: 0 },
+    { slot_num: 2, mode_key: 'slot_2', title: 'Slot 2', description: '', audio_script: '', duration_seconds: 0 },
+    { slot_num: 3, mode_key: 'slot_3', title: 'Slot 3', description: '', audio_script: '', duration_seconds: 0 },
+  ]);
+  const [isGeneratingSlotTTS, setIsGeneratingSlotTTS] = useState<number | null>(null);
+
   // Editor Tabs: 'visual' (WordPress Visual WYSIWYG) | 'code' (WordPress Text/Code) | 'split' | 'preview'
   const [activeTab, setActiveTab] = useState<'visual' | 'code' | 'split' | 'preview'>('visual');
 
@@ -68,6 +93,27 @@ export default function LiveEditor() {
   const [isFuriganaModalOpen, setIsFuriganaModalOpen] = useState(false);
   const [furiganaKanji, setFuriganaKanji] = useState('');
   const [furiganaReading, setFuriganaReading] = useState('');
+
+  // Intelligent WYSIWYG & Self-Healing States
+  const [isSmartPasteModalOpen, setIsSmartPasteModalOpen] = useState(false);
+  const [smartPasteRaw, setSmartPasteRaw] = useState('');
+  const [smartPasteAutoFurigana, setSmartPasteAutoFurigana] = useState(true);
+  const [isConvertingSmartPaste, setIsConvertingSmartPaste] = useState(false);
+  const [isAutoFixing, setIsAutoFixing] = useState(false);
+  const [isGeneratingFurigana, setIsGeneratingFurigana] = useState(false);
+
+  // Real-time Lint & Quality Health Info
+  const [lintInfo, setLintInfo] = useState<{
+    score: number;
+    status: string;
+    issues: Array<{ level: string; message: string }>;
+    stats: { headings: number; ruby_count: number; word_count: number; char_count: number };
+  }>({
+    score: 100,
+    status: 'excellent',
+    issues: [],
+    stats: { headings: 0, ruby_count: 0, word_count: 0, char_count: 0 },
+  });
 
   // Refs
   const visualEditorRef = useRef<HTMLDivElement>(null);
@@ -106,12 +152,27 @@ export default function LiveEditor() {
   // Synchronize Visual Editor DOM back to Markdown
   const syncVisualToMarkdown = useCallback(() => {
     if (visualEditorRef.current) {
+      const currentHtml = visualEditorRef.current.innerHTML.trim();
+      // Guard: If visual editor DOM was unmounted or empty but markdown has content, do not wipe out!
+      if ((!currentHtml || currentHtml === '<p><br></p>') && markdown.trim()) {
+        return markdown;
+      }
       const md = htmlToMarkdown(visualEditorRef.current);
       setMarkdown(md);
       return md;
     }
     return markdown;
   }, [markdown]);
+
+  // Robust synchronization hook: ensures visual editor DOM is always populated when activeTab is visual
+  useEffect(() => {
+    if (activeTab === 'visual' && editorMainTab === 'content' && visualEditorRef.current && markdown) {
+      const currentHtml = visualEditorRef.current.innerHTML.trim();
+      if (!currentHtml || currentHtml === '<p><br></p>') {
+        visualEditorRef.current.innerHTML = markdownToHtml(markdown);
+      }
+    }
+  }, [activeTab, editorMainTab, markdown]);
 
   // Load existing lesson or default template
   useEffect(() => {
@@ -127,8 +188,13 @@ export default function LiveEditor() {
             setSelectedCourseId(l.chapter.course_id);
             setSelectedChapterId(l.chapter.id);
           }
-          // Populate visual DOM
+          if (l.audio_tracks && l.audio_tracks.length > 0) {
+            setAudioTracks(l.audio_tracks);
+          }
+          // Populate visual DOM immediately and with fallback
+          syncMarkdownToVisual(raw);
           setTimeout(() => syncMarkdownToVisual(raw), 50);
+          setTimeout(() => syncMarkdownToVisual(raw), 250);
         })
         .catch((e) => console.error('Failed to load lesson', e));
     } else {
@@ -284,6 +350,188 @@ export default function LiveEditor() {
     }
   };
 
+  // Real-time Lint Runner
+  const runLint = useCallback(async (content: string) => {
+    if (!content.trim()) return;
+    try {
+      const res = await readerApi.lintMarkdown(content);
+      setLintInfo(res);
+    } catch (e) {
+      // silent
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      runLint(markdown);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [markdown, runLint]);
+
+  // Quick Action: 1-Click Auto-Fix & Self-Healing
+  const handleAutoFix = async () => {
+    let currentMd = markdown;
+    if (activeTab === 'visual') {
+      currentMd = syncVisualToMarkdown();
+    }
+    if (!currentMd.trim()) return;
+
+    try {
+      setIsAutoFixing(true);
+      const res = await readerApi.autoFixMarkdown(currentMd);
+      setMarkdown(res.fixed_markdown);
+      if (activeTab === 'visual') {
+        syncMarkdownToVisual(res.fixed_markdown);
+      }
+      if (res.issues_fixed && res.issues_fixed.length > 0) {
+        setStatusMsg({
+          type: 'success',
+          text: `Đã tự sửa ${res.changes_count} lỗi: ${res.issues_fixed.slice(0, 2).join(', ')}${res.issues_fixed.length > 2 ? '...' : ''}`,
+        });
+      } else {
+        setStatusMsg({
+          type: 'success',
+          text: 'Cú pháp bài học đã rất chuẩn, không phát hiện lỗi cần sửa!',
+        });
+      }
+      runLint(res.fixed_markdown);
+    } catch (err: any) {
+      console.error('Auto fix failed:', err);
+      setStatusMsg({ type: 'error', text: 'Tự sửa lỗi thất bại. Vui lòng thử lại!' });
+    } finally {
+      setIsAutoFixing(false);
+      setTimeout(() => setStatusMsg(null), 5000);
+    }
+  };
+
+  // Quick Action: 1-Click Auto-Generate Furigana
+  const handleAutoFurigana = async () => {
+    let currentMd = markdown;
+    if (activeTab === 'visual') {
+      currentMd = syncVisualToMarkdown();
+    }
+    if (!currentMd.trim()) return;
+
+    let targetText = currentMd;
+    let isSelectedOnly = false;
+    let selStart = 0;
+    let selEnd = 0;
+
+    if (activeTab === 'code' && codeTextareaRef.current) {
+      const ta = codeTextareaRef.current;
+      if (ta.selectionStart !== ta.selectionEnd) {
+        selStart = ta.selectionStart;
+        selEnd = ta.selectionEnd;
+        targetText = currentMd.substring(selStart, selEnd);
+        isSelectedOnly = true;
+      }
+    }
+
+    try {
+      setIsGeneratingFurigana(true);
+      const res = await readerApi.autoGenerateFurigana(targetText);
+      let updatedMd = currentMd;
+      if (isSelectedOnly) {
+        updatedMd = currentMd.substring(0, selStart) + res.converted_text + currentMd.substring(selEnd);
+      } else {
+        updatedMd = res.converted_text;
+      }
+      setMarkdown(updatedMd);
+      if (activeTab === 'visual') {
+        syncMarkdownToVisual(updatedMd);
+      }
+      setStatusMsg({
+        type: 'success',
+        text: `Đã tự động tạo Furigana cho ${res.ruby_added} từ Kanji (${res.kanji_count} chữ Hán)!`,
+      });
+      runLint(updatedMd);
+    } catch (err: any) {
+      console.error('Auto furigana failed:', err);
+      setStatusMsg({ type: 'error', text: 'Tự động tạo Furigana thất bại. Vui lòng thử lại!' });
+    } finally {
+      setIsGeneratingFurigana(false);
+      setTimeout(() => setStatusMsg(null), 5000);
+    }
+  };
+
+  // Quick Action: Smart Convert Raw Notes
+  const handleSmartConvert = async () => {
+    if (!smartPasteRaw.trim()) return;
+    try {
+      setIsConvertingSmartPaste(true);
+      const res = await readerApi.smartConvertNotes(smartPasteRaw, smartPasteAutoFurigana);
+      if (!lessonTitle.trim() || lessonTitle === 'New Lesson Title') {
+        setLessonTitle(res.title);
+      }
+      setMarkdown(res.markdown);
+      if (activeTab === 'visual') {
+        syncMarkdownToVisual(res.markdown);
+      }
+      setIsSmartPasteModalOpen(false);
+      setSmartPasteRaw('');
+      setStatusMsg({
+        type: 'success',
+        text: `Đã phân tích & cấu trúc bài học: "${res.title}"`,
+      });
+      runLint(res.markdown);
+    } catch (err: any) {
+      console.error('Smart convert failed:', err);
+      alert('Không thể chuyển đổi văn bản. Vui lòng kiểm tra lại nội dung dán!');
+    } finally {
+      setIsConvertingSmartPaste(false);
+      setTimeout(() => setStatusMsg(null), 5000);
+    }
+  };
+
+  // Quick Action: Insert Math
+  const handleInsertMath = () => {
+    const mathSnippet = `\n$$\nE = mc^2\n$$\n\n`;
+    if (activeTab === 'visual') {
+      insertHtmlAtCursor(`<p>$$E = mc^2$$</p><p><br></p>`);
+    } else {
+      insertCodeSnippet(mathSnippet);
+    }
+  };
+
+  // Quick Action: Insert Mermaid Diagram
+  const handleInsertMermaid = () => {
+    const mermaidSnippet = `\n\`\`\`mermaid\ngraph TD\n    A[Bắt đầu] --> B[Học Ngữ pháp]\n    B --> C[Luyện phản xạ JSST]\n    C --> D[Thành thạo]\n\`\`\`\n\n`;
+    if (activeTab === 'visual') {
+      insertHtmlAtCursor(`<pre><code data-language="mermaid">graph TD\n    A[Bắt đầu] --> B[Hoàn thành]</code></pre><p><br></p>`);
+    } else {
+      insertCodeSnippet(mermaidSnippet);
+    }
+  };
+
+  // Quick Action: Insert Vocab Card
+  const handleInsertVocabCard = () => {
+    const cardSnippet = `\n<vocabcard word="社会人" reading="しゃかいじん" meaning="Người đã đi làm, người trưởng thành trong xã hội" />\n\n`;
+    if (activeTab === 'visual') {
+      insertHtmlAtCursor(cardSnippet);
+    } else {
+      insertCodeSnippet(cardSnippet);
+    }
+  };
+
+  // Quick Action: Insert Quiz Block
+  const handleInsertQuiz = () => {
+    const quizSnippet = `\n<quiz question="Chọn đáp án đúng nhất:" options='["Lựa chọn A", "Lựa chọn B", "Lựa chọn C"]' correct="Lựa chọn A" />\n\n`;
+    if (activeTab === 'visual') {
+      insertHtmlAtCursor(quizSnippet);
+    } else {
+      insertCodeSnippet(quizSnippet);
+    }
+  };
+
+  // Quick Action: Insert Language Span Tag (<ja> or <vi>)
+  const handleInsertLangTag = (tag: 'ja' | 'vi') => {
+    if (activeTab === 'visual') {
+      insertHtmlAtCursor(`<${tag}>văn bản</${tag}> `);
+    } else {
+      insertCodeSnippet(`<${tag}>`, `</${tag}>`);
+    }
+  };
+
   // Save Lesson Handler
   const handleSave = async () => {
     if (!lessonTitle.trim()) {
@@ -336,17 +584,251 @@ export default function LiveEditor() {
     }
   };
 
+  // Active Slot helper properties & actions
+  const activeSlotNum = editorMainTab === 'slot1' ? 1 : editorMainTab === 'slot2' ? 2 : editorMainTab === 'slot3' ? 3 : 1;
+  const activeTrack = audioTracks.find((t) => t.slot_num === activeSlotNum) || {
+    slot_num: activeSlotNum,
+    mode_key: `slot_${activeSlotNum}`,
+    title: `Slot ${activeSlotNum}`,
+    description: '',
+    audio_script: '',
+    duration_seconds: 0,
+  };
+
+  const updateActiveTrack = (patch: Partial<AudioTrack>) => {
+    setAudioTracks((prev) => {
+      const idx = prev.findIndex((t) => t.slot_num === activeSlotNum);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...patch };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          slot_num: activeSlotNum,
+          mode_key: `slot_${activeSlotNum}`,
+          title: `Slot ${activeSlotNum}`,
+          description: '',
+          audio_script: '',
+          duration_seconds: 0,
+          ...patch,
+        },
+      ];
+    });
+  };
+
+  const handleSaveActiveSlot = async () => {
+    if (!lessonId) {
+      setStatusMsg({ type: 'error', text: 'Vui lòng lưu bài học chính trước khi lưu cấu hình Audio Slot!' });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await readerApi.updateAudioTrack(Number(lessonId), activeSlotNum, {
+        title: activeTrack.title || `Slot ${activeSlotNum}`,
+        description: activeTrack.description || '',
+        audio_script: activeTrack.audio_script || '',
+      });
+      setStatusMsg({ type: 'success', text: `Đã lưu cấu hình Audio Slot ${activeSlotNum} thành công!` });
+    } catch (err: any) {
+      console.error('Failed to save slot track:', err);
+      setStatusMsg({ type: 'error', text: err.response?.data?.detail || `Lỗi khi lưu Slot ${activeSlotNum}!` });
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setStatusMsg(null), 3000);
+    }
+  };
+
+  const handleGenerateSlotAudio = async () => {
+    if (!lessonId) {
+      setStatusMsg({ type: 'error', text: 'Vui lòng lưu bài học trước khi tạo Audio!' });
+      return;
+    }
+    setIsGeneratingSlotTTS(activeSlotNum);
+    setStatusMsg({ type: 'success', text: `Đang gửi lệnh tạo Audio AI cho Slot ${activeSlotNum}...` });
+    try {
+      const res = await readerApi.generateTTS(Number(lessonId), {
+        slot_num: activeSlotNum,
+        audio_script: activeTrack.audio_script || '',
+      });
+      if (res.audio_tracks) {
+        setAudioTracks(res.audio_tracks);
+      } else if (res.audio_url) {
+        updateActiveTrack({ audio_url: res.audio_url, duration_seconds: res.duration_seconds });
+      }
+      setStatusMsg({ type: 'success', text: `Tạo Audio AI cho Slot ${activeSlotNum} thành công!` });
+    } catch (err: any) {
+      console.error('Failed to generate audio:', err);
+      setStatusMsg({ type: 'error', text: err.response?.data?.detail || `Lỗi tạo Audio AI Slot ${activeSlotNum}!` });
+    } finally {
+      setIsGeneratingSlotTTS(null);
+      setTimeout(() => setStatusMsg(null), 4000);
+    }
+  };
+
+  const handleDeleteSlotAudio = async () => {
+    if (!lessonId) return;
+    if (!confirm(`Bạn có chắc muốn xóa file âm thanh đã tạo của Slot ${activeSlotNum}?`)) return;
+    try {
+      await readerApi.deleteAudioTrackFile(Number(lessonId), activeSlotNum);
+      updateActiveTrack({ audio_url: undefined, duration_seconds: 0 });
+      setStatusMsg({ type: 'success', text: `Đã xóa file Audio AI của Slot ${activeSlotNum}` });
+    } catch (err: any) {
+      console.error('Failed to delete track audio:', err);
+      setStatusMsg({ type: 'error', text: 'Lỗi xóa file âm thanh!' });
+    }
+  };
+
+  const slotScriptTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleInsertScriptPause = (pauseTag: string) => {
+    const el = slotScriptTextareaRef.current;
+    const currentScript = activeTrack.audio_script || '';
+    if (!el) {
+      updateActiveTrack({ audio_script: (currentScript ? currentScript + '\n' : '') + pauseTag });
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const nextScript = currentScript.substring(0, start) + `\n${pauseTag}\n` + currentScript.substring(end);
+    updateActiveTrack({ audio_script: nextScript });
+    setTimeout(() => {
+      el.focus();
+      const nextPos = start + pauseTag.length + 2;
+      el.setSelectionRange(nextPos, nextPos);
+    }, 50);
+  };
+
+  const handleCopyFromLessonMarkdown = () => {
+    if (!markdown.trim()) {
+      setStatusMsg({ type: 'error', text: 'Nội dung bài học hiện đang trống!' });
+      return;
+    }
+    let cleaned = markdown.replace(/<ruby>(.*?)<rt>.*?<\/rt><\/ruby>/gi, '$1');
+    cleaned = cleaned.replace(/<[^>]+>/g, '');
+    cleaned = cleaned.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+    cleaned = cleaned.replace(/^#+\s+/gm, '');
+    cleaned = cleaned.replace(/^\|.*\|$/gm, (match) => {
+      const cells = match.split('|').map((c) => c.trim()).filter(Boolean);
+      return cells.join(' — ');
+    });
+    cleaned = cleaned.replace(/[*_`~]/g, '');
+    cleaned = cleaned.trim();
+
+    updateActiveTrack({ audio_script: cleaned });
+    setStatusMsg({ type: 'success', text: 'Đã sao chép nội dung bài viết vào kịch bản Slot!' });
+    setTimeout(() => setStatusMsg(null), 3000);
+  };
+
+  // Browser speech testing inside Slot editor
+  const [isTestingSpeech, setIsTestingSpeech] = useState(false);
+  const handleToggleBrowserSpeech = () => {
+    if (isTestingSpeech) {
+      window.speechSynthesis.cancel();
+      setIsTestingSpeech(false);
+      return;
+    }
+    const script = activeTrack.audio_script || '';
+    if (!script.trim()) {
+      setStatusMsg({ type: 'error', text: 'Kịch bản Slot đang trống, vui lòng nhập nội dung!' });
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    setIsTestingSpeech(true);
+
+    const lines = script.split('\n');
+    const sentences: { text: string; lang: 'ja-JP' | 'vi-VN' | 'en-US' }[] = [];
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('[pause:') || trimmed.startsWith('//')) return;
+      const parts = trimmed.split(/(?<=[。！？!?\.\n])/g).map((p) => p.trim()).filter(Boolean);
+      parts.forEach((p) => {
+        sentences.push({
+          text: p,
+          lang: detectLanguage(p, 'ja-JP'),
+        });
+      });
+    });
+
+    if (sentences.length === 0) {
+      setIsTestingSpeech(false);
+      return;
+    }
+
+    let currentIndex = 0;
+    const speakNext = () => {
+      if (currentIndex >= sentences.length) {
+        setIsTestingSpeech(false);
+        return;
+      }
+      const item = sentences[currentIndex];
+      const utter = new SpeechSynthesisUtterance(item.text);
+      utter.lang = item.lang;
+      utter.rate = 1.0;
+      utter.onend = () => {
+        currentIndex++;
+        speakNext();
+      };
+      utter.onerror = () => {
+        currentIndex++;
+        speakNext();
+      };
+      window.speechSynthesis.speak(utter);
+    };
+
+    speakNext();
+  };
+
   // Keyboard shortcut Ctrl+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        handleSave();
+        if (editorMainTab === 'content') {
+          handleSave();
+        } else {
+          handleSaveActiveSlot();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lessonTitle, selectedChapterId, markdown, activeTab]);
+  }, [lessonTitle, selectedChapterId, markdown, activeTab, editorMainTab, activeTrack, lessonId]);
+
+  if (!isAuthLoading && (!isLoggedIn || user?.role !== 'admin')) {
+    return (
+      <div className="min-h-screen bg-[#070a13] text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-4 shadow-lg shadow-rose-500/10">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Quyền Truy Cập Bị Giới Hạn</h2>
+        <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
+          Trang Soạn Thảo WYSIWYG & Quản Trị Bài Học chỉ dành riêng cho Quản trị viên (Admin). Vui lòng đăng nhập với tài khoản Quản trị viên hoặc quay lại Thư viện khóa học.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/courses')}
+            className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-all cursor-pointer"
+          >
+            Quay lại Thư viện
+          </button>
+          {!isLoggedIn && (
+            <button
+              type="button"
+              onClick={() => navigate(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)}
+              className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/20 transition-all cursor-pointer"
+            >
+              Đăng nhập Admin
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-[#0b0f19] text-slate-100 font-sans select-none">
@@ -382,80 +864,170 @@ export default function LiveEditor() {
           )}
         </div>
 
-        {/* WordPress-Style Editor Mode Tabs */}
-        <div className="flex items-center gap-3">
-          <div className="flex rounded-xl bg-slate-800/90 p-1 border border-slate-700/60 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => handleTabChange('visual')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'visual'
-                  ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="WordPress Visual WYSIWYG Editor"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Trực quan</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTabChange('code')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'code'
-                  ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="WordPress Text & Markdown Code View (Paste raw code/markdown here)"
-            >
-              <FileCode className="w-3.5 h-3.5" />
-              <span>Văn bản / Code</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTabChange('split')}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'split'
-                  ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="Side-by-side Split View"
-            >
-              <Columns2 className="w-3.5 h-3.5" />
-              <span>Song song</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTabChange('preview')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'preview'
-                  ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="Full Student Reading Preview"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Xem bài</span>
-            </button>
-          </div>
-
+        {/* 4 Primary Editor Pages / Tabs */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
           <button
             type="button"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            onClick={() => setEditorMainTab('content')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              editorMainTab === 'content'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/25'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            <Save className="w-4 h-4" />
-            <span>{isSaving ? 'Đang lưu...' : 'Lưu bài (Ctrl+S)'}</span>
+            <FileText className="w-3.5 h-3.5" />
+            <span>1. Bài viết</span>
           </button>
+
+          {[1, 2, 3].map((slotNum) => {
+            const tabKey = `slot${slotNum}` as 'slot1' | 'slot2' | 'slot3';
+            const trk = audioTracks.find((t) => t.slot_num === slotNum);
+            const hasAudio = !!trk?.audio_url;
+            const hasScript = !!trk?.audio_script?.trim();
+            const isSelected = editorMainTab === tabKey;
+
+            return (
+              <button
+                key={slotNum}
+                type="button"
+                onClick={() => setEditorMainTab(tabKey)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer relative ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span>Slot {slotNum}</span>
+                {hasAudio ? (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Đã có file Audio AI" />
+                ) : hasScript ? (
+                  <span className="w-2 h-2 rounded-full bg-sky-400" title="Đã có kịch bản" />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right Action Section */}
+        <div className="flex items-center gap-3">
+          {editorMainTab === 'content' ? (
+            <>
+              {/* WordPress-Style Editor Mode Tabs */}
+              <div className="flex rounded-xl bg-slate-800/90 p-1 border border-slate-700/60 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('visual')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeTab === 'visual'
+                      ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="WordPress Visual WYSIWYG Editor"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Trực quan</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('code')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeTab === 'code'
+                      ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="WordPress Text & Markdown Code View (Paste raw code/markdown here)"
+                >
+                  <FileCode className="w-3.5 h-3.5" />
+                  <span>Văn bản / Code</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('split')}
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeTab === 'split'
+                      ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Side-by-side Split View"
+                >
+                  <Columns2 className="w-3.5 h-3.5" />
+                  <span>Song song</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('preview')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeTab === 'preview'
+                      ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/20'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Full Student Reading Preview"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Xem bài</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isSaving ? 'Đang lưu...' : 'Lưu bài (Ctrl+S)'}</span>
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Slot Mode Actions */}
+              <button
+                type="button"
+                onClick={handleToggleBrowserSpeech}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  isTestingSpeech
+                    ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 animate-pulse'
+                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700/80 text-sky-400'
+                }`}
+                title="Nghe thử kịch bản này trực tiếp bằng Trình duyệt"
+              >
+                {isTestingSpeech ? <RotateCcw className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                <span>{isTestingSpeech ? 'Dừng đọc' : 'Nghe trình duyệt'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGenerateSlotAudio}
+                disabled={isGeneratingSlotTTS !== null}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                title="Tạo file MP3 Edge-TTS cho Slot này"
+              >
+                {isGeneratingSlotTTS === activeSlotNum ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                <span>Tạo Audio AI</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveActiveSlot}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isSaving ? 'Đang lưu...' : `Lưu Slot ${activeSlotNum} (Ctrl+S)`}</span>
+              </button>
+            </>
+          )}
         </div>
       </header>
 
-      {/* Lesson Metadata Sub-Header */}
-      <div className="px-4 py-2.5 bg-slate-900/40 border-b border-slate-800 flex flex-wrap items-center gap-3 shrink-0 text-xs">
+      {editorMainTab === 'content' && (
+        <>
+          {/* Lesson Metadata Sub-Header */}
+          <div className="px-4 py-2.5 bg-slate-900/40 border-b border-slate-800 flex flex-wrap items-center gap-3 shrink-0 text-xs">
         <input
           type="text"
           value={lessonTitle}
@@ -606,12 +1178,12 @@ export default function LiveEditor() {
 
         <div className="w-px h-4 bg-slate-800 mx-1" />
 
-        {/* Table & Code Insert */}
+        {/* Table, Code & Interactive Blocks */}
         <button
           type="button"
           onClick={handleInsertTable}
-          title="Insert Table"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+          title="Chèn bảng dữ liệu (Markdown Table)"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
         >
           <TableIcon className="w-3.5 h-3.5 text-sky-400" />
           <span>Bảng</span>
@@ -620,21 +1192,85 @@ export default function LiveEditor() {
         <button
           type="button"
           onClick={() => setIsCodeModalOpen(true)}
-          title="Insert Code Block with Language Selector"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+          title="Chèn khối mã nguồn code"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
         >
           <Code2 className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Chèn Code</span>
+          <span>Code</span>
+        </button>
+
+        {/* KaTeX Math */}
+        <button
+          type="button"
+          onClick={handleInsertMath}
+          title="Chèn công thức toán học KaTeX ($$E=mc^2$$)"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+        >
+          <Calculator className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Toán</span>
+        </button>
+
+        {/* Mermaid Diagram */}
+        <button
+          type="button"
+          onClick={handleInsertMermaid}
+          title="Chèn sơ đồ lưu trình Mermaid Diagram"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+        >
+          <GitFork className="w-3.5 h-3.5 text-amber-400" />
+          <span>Sơ đồ</span>
+        </button>
+
+        {/* Vocab Card */}
+        <button
+          type="button"
+          onClick={handleInsertVocabCard}
+          title="Chèn thẻ từ vựng tương tác (<vocabcard>)"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+        >
+          <CreditCard className="w-3.5 h-3.5 text-purple-400" />
+          <span>Thẻ từ</span>
+        </button>
+
+        {/* Quiz Block */}
+        <button
+          type="button"
+          onClick={handleInsertQuiz}
+          title="Chèn câu hỏi trắc nghiệm tương tác (<quiz>)"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors cursor-pointer"
+        >
+          <HelpCircle className="w-3.5 h-3.5 text-rose-400" />
+          <span>Quiz</span>
+        </button>
+
+        <div className="w-px h-4 bg-slate-800 mx-1" />
+
+        {/* Language tags */}
+        <button
+          type="button"
+          onClick={() => handleInsertLangTag('ja')}
+          title="Gắn thẻ tiếng Nhật <ja>...</ja>"
+          className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-mono font-bold border border-slate-700/60 cursor-pointer"
+        >
+          &lt;ja&gt;
+        </button>
+        <button
+          type="button"
+          onClick={() => handleInsertLangTag('vi')}
+          title="Gắn thẻ tiếng Việt <vi>...</vi>"
+          className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-mono font-bold border border-slate-700/60 cursor-pointer"
+        >
+          &lt;vi&gt;
         </button>
 
         <button
           type="button"
           onClick={() => setIsFuriganaModalOpen(true)}
-          title="Insert Japanese Ruby (Furigana)"
+          title="Chèn Furigana thủ công"
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 text-xs font-semibold border border-sky-500/30 transition-colors cursor-pointer"
         >
           <Languages className="w-3.5 h-3.5 text-sky-400" />
-          <span>Furigana</span>
+          <span>Ruby</span>
         </button>
 
         <div className="w-px h-4 bg-slate-800 mx-1" />
@@ -644,24 +1280,120 @@ export default function LiveEditor() {
           <button
             type="button"
             onClick={() => handleInsertAlert('NOTE')}
-            className="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[11px] font-semibold hover:bg-sky-500/20"
+            className="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[11px] font-semibold hover:bg-sky-500/20 cursor-pointer"
           >
             [!NOTE]
           </button>
           <button
             type="button"
             onClick={() => handleInsertAlert('TIP')}
-            className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[11px] font-semibold hover:bg-cyan-500/20"
+            className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[11px] font-semibold hover:bg-cyan-500/20 cursor-pointer"
           >
             [!TIP]
           </button>
           <button
             type="button"
             onClick={() => handleInsertAlert('WARNING')}
-            className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[11px] font-semibold hover:bg-amber-500/20"
+            className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[11px] font-semibold hover:bg-amber-500/20 cursor-pointer"
           >
             [!WARN]
           </button>
+        </div>
+      </div>
+
+      {/* Smart AI, Automation & Health Sub-Toolbar */}
+      <div className="px-4 py-2 bg-slate-950/80 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0 text-xs">
+        {/* Left Side: 1-Click Smart Tools */}
+        <div className="flex items-center gap-2">
+          {/* 1-Click Auto-Fix & Self-Healing */}
+          <button
+            type="button"
+            disabled={isAutoFixing}
+            onClick={handleAutoFix}
+            title="Tự động sửa lỗi cú pháp Markdown, đóng thẻ HTML/Ruby, tách câu chuẩn cho TTS"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 font-bold border border-emerald-500/40 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+          >
+            {isAutoFixing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+            ) : (
+              <Wand2 className="w-3.5 h-3.5 text-emerald-400" />
+            )}
+            <span>Tự sửa lỗi (Auto-Fix)</span>
+          </button>
+
+          {/* 1-Click Auto-Generate Furigana */}
+          <button
+            type="button"
+            disabled={isGeneratingFurigana}
+            onClick={handleAutoFurigana}
+            title="Tự động nhận diện chữ Hán Kanji và tạo phiên âm Furigana (ruby)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500/20 to-blue-500/20 hover:from-sky-500/30 hover:to-blue-500/30 text-sky-300 font-bold border border-sky-500/40 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+          >
+            {isGeneratingFurigana ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+            )}
+            <span>Auto Furigana</span>
+          </button>
+
+          {/* Smart Paste (From Word / ChatGPT) */}
+          <button
+            type="button"
+            onClick={() => setIsSmartPasteModalOpen(true)}
+            title="Dán văn bản thô từ Word/ChatGPT và tự động cấu trúc thành bài học MDX hoàn chỉnh"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold border border-slate-700/60 cursor-pointer transition-all"
+          >
+            <ClipboardPaste className="w-3.5 h-3.5 text-amber-400" />
+            <span>Dán thông minh</span>
+          </button>
+        </div>
+
+        {/* Right Side: Quality Health & Structural HUD */}
+        <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
+          <span className="flex items-center gap-1">
+            <span className="text-slate-500">Đề mục:</span>
+            <span className="font-bold text-sky-400">{lintInfo.stats.headings}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="text-slate-500">Furigana:</span>
+            <span className="font-bold text-sky-400">{lintInfo.stats.ruby_count}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="text-slate-500">Từ:</span>
+            <span className="font-bold text-slate-300">{lintInfo.stats.word_count}</span>
+          </span>
+
+          <div className="h-3 w-px bg-slate-800" />
+
+          {/* Quality Score Badge */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500">Chất lượng:</span>
+            <span
+              className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                lintInfo.score >= 90
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : lintInfo.score >= 70
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+              }`}
+            >
+              {lintInfo.score}/100
+            </span>
+          </div>
+
+          {/* Warning quick-fix button if any issues */}
+          {lintInfo.issues.length > 0 && (
+            <button
+              type="button"
+              onClick={handleAutoFix}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-sans text-[11px] font-bold cursor-pointer transition-all animate-pulse"
+              title={lintInfo.issues.map((i) => i.message).join('\n')}
+            >
+              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              <span>{lintInfo.issues.length} lỗi [Tự sửa ⚡]</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -754,6 +1486,231 @@ export default function LiveEditor() {
           </div>
         </div>
       </div>
+        </>
+      )}
+
+      {/* ========================================================= */}
+      {/* AUDIO SLOT STUDIO (Slot 1 / Slot 2 / Slot 3)              */}
+      {/* ========================================================= */}
+      {editorMainTab !== 'content' && (
+        <div className="flex-1 flex flex-col min-h-0 bg-[#070a13] overflow-hidden">
+          {/* Slot Metadata Bar */}
+          <div className="px-6 py-3 bg-slate-900/60 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 shrink-0">
+            <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold font-mono text-sm">
+                S{activeSlotNum}
+              </div>
+              <div className="flex-1 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={activeTrack.title || `Slot ${activeSlotNum}`}
+                  onChange={(e) => updateActiveTrack({ title: e.target.value })}
+                  placeholder={`Tên Slot ${activeSlotNum}...`}
+                  className="bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-1.5 text-white text-sm font-bold focus:outline-none focus:border-indigo-500 w-44"
+                />
+                <input
+                  type="text"
+                  value={activeTrack.description || ''}
+                  onChange={(e) => updateActiveTrack({ description: e.target.value })}
+                  placeholder="Ghi chú cấu hình Slot (ví dụ: Đọc câu hỏi, nghỉ 2s, đọc câu trả lời tiếng Nhật)..."
+                  className="flex-1 bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Quick Actions for Script */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Chèn khoảng lặng:</span>
+              <button
+                type="button"
+                onClick={() => handleInsertScriptPause('[pause: 2s]')}
+                className="px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-mono font-bold transition-all cursor-pointer"
+                title="Chèn lệnh nghỉ 2 giây giữa các câu"
+              >
+                + [pause: 2s]
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInsertScriptPause('[pause: 1s]')}
+                className="px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-mono font-bold transition-all cursor-pointer"
+                title="Chèn lệnh nghỉ 1 giây"
+              >
+                + [pause: 1s]
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInsertScriptPause('[pause: 500ms]')}
+                className="px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-mono font-bold transition-all cursor-pointer"
+                title="Chèn lệnh nghỉ 500ms"
+              >
+                + [pause: 500ms]
+              </button>
+
+              <div className="h-4 w-px bg-slate-800 mx-1" />
+
+              <button
+                type="button"
+                onClick={handleCopyFromLessonMarkdown}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all cursor-pointer"
+                title="Sao chép toàn bộ văn bản từ bài viết chính và làm sạch thẻ furigana"
+              >
+                <Copy className="w-3.5 h-3.5 text-sky-400" />
+                <span>Lấy từ bài viết</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => updateActiveTrack({ audio_script: '' })}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 transition-all cursor-pointer"
+                title="Xóa trắng kịch bản"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Main 2-column Studio Area */}
+          <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+            {/* Left Column: Script Textarea */}
+            <div className="flex-1 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-slate-800">
+              <div className="px-6 py-2.5 bg-slate-900/40 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+                <span className="flex items-center gap-2 font-semibold text-slate-300">
+                  <FileCode className="w-4 h-4 text-indigo-400" />
+                  Kịch bản âm thanh (Audio Script) — Độc lập với nội dung bài viết
+                </span>
+                <div className="flex items-center gap-3 font-mono text-[11px]">
+                  <span>Ký tự: <strong className="text-white">{(activeTrack.audio_script || '').length}</strong></span>
+                  <span>Dòng: <strong className="text-white">{(activeTrack.audio_script || '').split('\n').length}</strong></span>
+                  <span>Ước tính: <strong className="text-indigo-400">~{Math.round((activeTrack.audio_script || '').length / 6)}s</strong></span>
+                </div>
+              </div>
+
+              <textarea
+                ref={slotScriptTextareaRef}
+                value={activeTrack.audio_script || ''}
+                onChange={(e) => updateActiveTrack({ audio_script: e.target.value })}
+                placeholder={`Nhập kịch bản âm thanh cho Slot ${activeSlotNum} tại đây...
+Ví dụ:
+あなたにとって最も大切なものは何ですか。その理由も教えてください。
+[pause: 2s]
+四季の中で、私は秋が一番好きです。
+[pause: 1s]
+涼しい気候で散歩が気持ちいいです。`}
+                className="flex-1 w-full p-6 bg-[#060810] text-slate-200 font-mono text-sm leading-relaxed resize-none focus:outline-none selection:bg-indigo-600/30 overflow-y-auto"
+              />
+            </div>
+
+            {/* Right Column: Audio Output & Speech Player Test Card */}
+            <div className="w-full lg:w-96 bg-slate-900/30 p-6 flex flex-col gap-6 overflow-y-auto shrink-0">
+              {/* Card 1: Browser Speech Testing */}
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-sky-400" />
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Trình duyệt Đọc</h4>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">
+                    Web Speech API
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Nghe trực tiếp kịch bản trên bằng giọng đọc của trình duyệt máy bạn (tự động nhận diện tiếng Nhật & tiếng Việt theo từng câu).
+                </p>
+                <button
+                  type="button"
+                  onClick={handleToggleBrowserSpeech}
+                  className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    isTestingSpeech
+                      ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/25 animate-pulse'
+                      : 'bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/25'
+                  }`}
+                >
+                  {isTestingSpeech ? (
+                    <>
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Dừng đọc trình duyệt</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Nghe thử bằng Trình duyệt</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Card 2: AI Pre-generated Audio (Edge-TTS) */}
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-400" />
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Audio AI Tạo Sẵn</h4>
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                    activeTrack.audio_url
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}>
+                    {activeTrack.audio_url ? 'Đã tạo MP3' : 'Chưa tạo'}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Tổng hợp kịch bản thành file MP3 chất lượng phòng thu (Edge-TTS) với đầy đủ khoảng lặng và lưu trên server.
+                </p>
+
+                {activeTrack.audio_url ? (
+                  <div className="space-y-3 pt-2">
+                    <audio
+                      controls
+                      src={activeTrack.audio_url}
+                      className="w-full h-10 rounded-lg"
+                    />
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                      <span>Thời lượng: {activeTrack.duration_seconds || 0}s</span>
+                      <button
+                        type="button"
+                        onClick={handleDeleteSlotAudio}
+                        className="flex items-center gap-1 text-rose-400 hover:text-rose-300 font-sans cursor-pointer transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Xóa file này</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={handleGenerateSlotAudio}
+                  disabled={isGeneratingSlotTTS !== null}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                >
+                  {isGeneratingSlotTTS === activeSlotNum ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Đang tổng hợp Audio AI...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>{activeTrack.audio_url ? 'Tạo lại Audio AI (Ghi đè)' : 'Tạo Audio AI ngay'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Tips */}
+              <div className="p-4 rounded-xl bg-indigo-950/20 border border-indigo-900/40 text-[11px] text-indigo-300/80 space-y-1.5 leading-relaxed">
+                <span className="font-bold text-indigo-300 block">💡 Mẹo quản lý Slot:</span>
+                <p>• Kịch bản âm thanh hoàn toàn độc lập với bài viết.</p>
+                <p>• Dùng <code>[pause: 2s]</code> để ngắt nhịp suy nghĩ trước khi nghe câu trả lời.</p>
+                <p>• Nhấn <strong>Lưu Slot (Ctrl+S)</strong> để lưu kịch bản vào cơ sở dữ liệu.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Code Block Inserter Modal */}
       {isCodeModalOpen && (
@@ -892,6 +1849,85 @@ export default function LiveEditor() {
                 className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-xs font-bold text-white shadow-lg shadow-sky-600/25"
               >
                 Chèn Furigana
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Smart Paste & Auto-Converter Modal */}
+      {isSmartPasteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-6 sm:p-8 space-y-5 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <ClipboardPaste className="w-5 h-5 text-amber-400" />
+                  Dán thông minh & Tự động tạo bài giảng
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Dán bản ghi thô từ Word, PDF, ChatGPT hoặc giáo trình. Hệ thống sẽ tự phân tích đề mục, câu hỏi, câu trả lời, bảng từ vựng và tự động tạo Furigana.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSmartPasteModalOpen(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <textarea
+                  rows={10}
+                  value={smartPasteRaw}
+                  onChange={(e) => setSmartPasteRaw(e.target.value)}
+                  placeholder="Dán nội dung bài học thô vào đây...&#10;Ví dụ:&#10;Câu 1: Bạn thích mùa nào nhất trong năm?&#10;四季の中で、私は秋が一番好きです。&#10;Trong bốn mùa, tôi thích nhất mùa thu.&#10;Từ vựng:&#10;四季: bốn mùa&#10;気候: khí hậu"
+                  className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs sm:text-sm font-sans text-slate-200 focus:outline-none focus:border-sky-500 resize-none leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                <input
+                  type="checkbox"
+                  id="smart-paste-furigana"
+                  checked={smartPasteAutoFurigana}
+                  onChange={(e) => setSmartPasteAutoFurigana(e.target.checked)}
+                  className="w-4 h-4 rounded text-sky-600 focus:ring-0 bg-slate-800 border-slate-700 cursor-pointer"
+                />
+                <label htmlFor="smart-paste-furigana" className="text-xs text-slate-300 font-medium cursor-pointer">
+                  Tự động nhận diện chữ Hán và gắn phiên âm Furigana (&lt;ruby&gt;漢字&lt;rt&gt;かんじ&lt;/rt&gt;&lt;/ruby&gt;)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsSmartPasteModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={!smartPasteRaw.trim() || isConvertingSmartPaste}
+                onClick={handleSmartConvert}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-xs font-bold text-white shadow-lg shadow-sky-600/25 transition-all cursor-pointer disabled:opacity-40"
+              >
+                {isConvertingSmartPaste ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang chuyển đổi & sinh Furigana...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4" />
+                    <span>⚡ Phân tích & Tạo bài giảng</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

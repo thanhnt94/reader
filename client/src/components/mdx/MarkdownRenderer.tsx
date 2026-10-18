@@ -10,7 +10,9 @@ import { CodeBlock } from './CodeBlock';
 import { MermaidBlock } from './MermaidBlock';
 import { VocabCard } from './VocabCard';
 import { QuizBlock } from './QuizBlock';
-import { Info, Lightbulb, AlertTriangle, Flame, AlertCircle } from 'lucide-react';
+import { FlashcardDeck } from './FlashcardDeck';
+import { ReflexBlock } from './ReflexBlock';
+import { Info, Lightbulb, AlertTriangle, Flame, AlertCircle, CheckCircle2, Circle } from 'lucide-react';
 
 interface MarkdownRendererProps {
   content: string;
@@ -18,14 +20,50 @@ interface MarkdownRendererProps {
   activeSentenceText?: string | null;
   fontSize?: 'sm' | 'base' | 'lg' | 'xl';
   lineSpacing?: 'normal' | 'relaxed' | 'loose';
+  completedSections?: string[];
+  onToggleSection?: (sectionId: string) => void;
+  showFurigana?: boolean;
+  tocData?: Array<{ id: string; text: string; level: number }> | null;
 }
+
+const getNodeText = (node: any): string => {
+  if (!node) return '';
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(getNodeText).join('');
+  if (node.props?.children) return getNodeText(node.props.children);
+  return '';
+};
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   activeSentenceText,
   fontSize = 'base',
   lineSpacing = 'relaxed',
+  completedSections,
+  onToggleSection,
+  showFurigana = true,
+  tocData,
 }) => {
+  // Helper to map heading text to exact TOC ID
+  const resolveHeadingId = (idFromPlugin: string | undefined, children: any): string => {
+    const rawText = getNodeText(children).trim();
+    if (!rawText) return idFromPlugin || '';
+
+    if (tocData && tocData.length > 0) {
+      const cleanRaw = rawText.replace(/^[^\w\s]+/, '').trim().toLowerCase();
+      const matched = tocData.find((item) => {
+        const itemClean = item.text.replace(/^[^\w\s]+/, '').trim().toLowerCase();
+        return (
+          itemClean === cleanRaw ||
+          (cleanRaw.length > 3 && itemClean.includes(cleanRaw)) ||
+          (itemClean.length > 3 && cleanRaw.includes(itemClean))
+        );
+      });
+      if (matched) return matched.id;
+    }
+    return idFromPlugin || '';
+  };
   // Font size mapping
   const sizeClasses = {
     sm: 'text-sm leading-6',
@@ -50,22 +88,32 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
   // Strip YAML frontmatter from markdown body and ensure Vietnamese translations break to a new line!
   const cleanContent = React.useMemo(() => {
-    if (!content) return '';
     let text = content.replace(/^\s*---[\r\n]+[\s\S]*?[\r\n]+---\s*[\r\n]*/, '').trim();
+    // Strip any speech/nospeech tags so only pure display content remains
+    text = text.replace(/<\/?nospeech>/gi, '');
+
+    // In blockquotes (>), break consecutive lines into separate paragraph elements so each sentence is isolated
+    text = text.replace(/^(>\s*[^\n]+)\n(>\s*\*)/gm, '$1\n>\n$2');
+    text = text.replace(/^(>\s*\*?[^\n]+)\n(>\s*[^\n*#>])/gm, '$1\n>\n$2');
 
     // Ensure translations or consecutive lines under Japanese/dialogue break into a new paragraph (Enter xuống 1 dòng):
     // 1. Line followed immediately by italic translation (*...*)
     text = text.replace(/([^\n])\n(\s*\*)/g, '$1\n\n$2');
 
     // 2. Line with Japanese characters immediately followed by a non-empty text line
-    text = text.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF>][^\n]*)\n([^\n#*|>])/g, '$1\n\n$2');
+    text = text.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF][^\n]*)\n([^\n#*|>])/g, '$1\n\n$2');
 
     return text;
   }, [content]);
 
 
   return (
-    <div className={`prose prose-invert max-w-none text-slate-200 ${sizeClasses} ${spacingClasses}`}>
+    <div
+      className={`prose prose-invert max-w-none text-slate-200 ${sizeClasses} ${spacingClasses} ${
+        showFurigana === false ? 'hide-furigana' : ''
+      }`}
+      data-furigana={showFurigana === false ? 'false' : 'true'}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug]}
@@ -78,18 +126,70 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               </h1>
             );
           },
-          h2({ children, ...props }: any) {
+          h2({ id, children, ...props }: any) {
+            const finalId = resolveHeadingId(id, children);
+            const isDone = finalId && completedSections?.includes(finalId);
             return (
-              <h2 className="text-xl sm:text-2xl font-bold text-sky-400 mt-8 mb-3 tracking-tight border-b border-slate-800/60 pb-2" {...props}>
-                {children}
-              </h2>
+              <div id={finalId} className="group flex items-center justify-between gap-3 mt-8 mb-3 border-b border-slate-800/60 pb-2 scroll-mt-28">
+                <h2 id={finalId ? `${finalId}-title` : id} className="text-xl sm:text-2xl font-bold text-sky-400 tracking-tight" {...props}>
+                  {children}
+                </h2>
+                {finalId && onToggleSection && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSection(finalId);
+                    }}
+                    title={isDone ? 'Đã hoàn thành mục này (nhấn để hoàn tác)' : 'Đánh dấu đã hoàn thành mục này'}
+                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isDone
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
+                        : 'opacity-50 group-hover:opacity-100 hover:bg-slate-800 text-slate-400 border border-slate-700/60'
+                    }`}
+                  >
+                    {isDone ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Circle className="w-3.5 h-3.5 text-slate-500" />
+                    )}
+                    <span className="text-[11px] hidden sm:inline">{isDone ? 'Đã học' : 'Xong'}</span>
+                  </button>
+                )}
+              </div>
             );
           },
-          h3({ children, ...props }: any) {
+          h3({ id, children, ...props }: any) {
+            const finalId = resolveHeadingId(id, children);
+            const isDone = finalId && completedSections?.includes(finalId);
             return (
-              <h3 className="text-lg sm:text-xl font-bold text-slate-100 mt-6 mb-2 tracking-tight" {...props}>
-                {children}
-              </h3>
+              <div id={finalId} className="group flex items-center justify-between gap-3 mt-6 mb-2 scroll-mt-28">
+                <h3 id={finalId ? `${finalId}-title` : id} className={`text-lg sm:text-xl font-bold tracking-tight transition-colors ${isDone ? 'text-emerald-300/90' : 'text-slate-100'}`} {...props}>
+                  {children}
+                </h3>
+                {finalId && onToggleSection && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSection(finalId);
+                    }}
+                    title={isDone ? 'Đã hoàn thành mẫu này (nhấn để hoàn tác)' : 'Đánh dấu đã hoàn thành mẫu này'}
+                    className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                      isDone
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'opacity-40 group-hover:opacity-100 hover:bg-slate-800 text-slate-400 border border-slate-800'
+                    }`}
+                  >
+                    {isDone ? (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <Circle className="w-3 h-3 text-slate-500" />
+                    )}
+                    <span className="hidden sm:inline">{isDone ? 'Đã xong' : 'Xong'}</span>
+                  </button>
+                )}
+              </div>
             );
           },
           h4({ children, ...props }: any) {
@@ -169,6 +269,49 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
             if (lang === 'mermaid') {
               return <MermaidBlock chart={codeString} />;
+            }
+
+            if (lang === 'flashcard' || lang === 'flashcards') {
+              return <FlashcardDeck dataString={codeString} />;
+            }
+
+            if (lang === 'reflex' || lang === 'reflexes') {
+              return <ReflexBlock dataString={codeString} />;
+            }
+
+            if (lang === 'quiz') {
+              try {
+                const parsed = JSON.parse(codeString);
+                return <QuizBlock {...parsed} />;
+              } catch {
+                const lines = codeString.split('\n').map((l: string) => l.trim()).filter(Boolean);
+                let question = '';
+                const options: string[] = [];
+                let correct = 0;
+                let explanation = '';
+
+                for (const line of lines) {
+                  if (/^(?:Q|Câu hỏi)\s*[:：]/i.test(line)) {
+                    question = line.replace(/^(?:Q|Câu hỏi)\s*[:：]\s*/i, '');
+                  } else if (/^[A-D]\s*[:：.]\s*/i.test(line)) {
+                    options.push(line.replace(/^[A-D]\s*[:：.]\s*/i, ''));
+                  } else if (/^[-*•]\s*/.test(line)) {
+                    options.push(line.replace(/^[-*•]\s*/, ''));
+                  } else if (/^(?:Correct|Đáp án|Đúng)\s*[:：]/i.test(line)) {
+                    const ans = line.replace(/^(?:Correct|Đáp án|Đúng)\s*[:：]\s*/i, '').trim();
+                    if (/^[A-D]$/i.test(ans)) {
+                      correct = ans.toUpperCase().charCodeAt(0) - 65;
+                    } else {
+                      correct = parseInt(ans, 10) || 0;
+                    }
+                  } else if (/^(?:Exp|Explanation|Giải thích)\s*[:：]/i.test(line)) {
+                    explanation = line.replace(/^(?:Exp|Explanation|Giải thích)\s*[:：]\s*/i, '');
+                  } else if (!question) {
+                    question = line;
+                  }
+                }
+                return <QuizBlock question={question} options={options} correct={correct} explanation={explanation} />;
+              }
             }
 
             if (match) {
@@ -290,23 +433,38 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           // Table styling with mobile responsiveness
           table({ children }: any) {
             return (
-              <div className="my-5 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/50 shadow-sm -mx-2 sm:mx-0">
-                <table className="w-full min-w-[320px] text-left border-collapse text-xs sm:text-sm text-slate-300">
-                  {children}
-                </table>
+              <div className="my-6 rounded-xl sm:rounded-2xl border border-slate-800 bg-slate-900/60 shadow-lg overflow-hidden -mx-2 sm:mx-0">
+                <div className="sm:hidden px-3.5 py-1.5 bg-slate-800/90 border-b border-slate-700/80 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-sky-400"></span> Bảng dữ liệu thực chiến
+                  </span>
+                  <span className="text-sky-400 font-medium flex items-center gap-1">👉 Vuốt sang phải để xem đủ cột</span>
+                </div>
+                <div className="overflow-x-auto max-w-full touch-pan-x overscroll-x-contain">
+                  <table className="w-full min-w-[680px] text-left border-collapse text-xs sm:text-sm text-slate-300">
+                    {children}
+                  </table>
+                </div>
               </div>
             );
           },
           th({ children }: any) {
             return (
-              <th className="px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-800/80 font-bold text-slate-200 border-b border-slate-800 text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap">
+              <th className="px-3.5 sm:px-4 py-2.5 sm:py-3 bg-slate-800/95 font-bold text-slate-100 border-b border-slate-700 text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap">
                 {children}
               </th>
             );
           },
+          tr({ children }: any) {
+            return (
+              <tr className="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors">
+                {children}
+              </tr>
+            );
+          },
           td({ children }: any) {
             return (
-              <td className="px-3 sm:px-4 py-2 sm:py-3 border-b border-slate-800/60 text-xs sm:text-sm leading-relaxed">
+              <td className="px-3.5 sm:px-4 py-2.5 sm:py-3.5 border-b border-slate-800/60 text-xs sm:text-sm leading-relaxed align-top">
                 {children}
               </td>
             );
@@ -316,9 +474,30 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           ja: ({ children }: any) => <span lang="ja" className="font-medium text-slate-100">{children}</span>,
           vi: ({ children }: any) => <span lang="vi">{children}</span>,
 
+          // Collapsible native details & summary
+          details({ children, ...props }: any) {
+            return (
+              <details className="my-4 rounded-xl border border-slate-700/60 bg-slate-900/60 p-4 transition-all group" {...props}>
+                {children}
+              </details>
+            );
+          },
+          summary({ children, ...props }: any) {
+            return (
+              <summary className="font-semibold text-sky-400 cursor-pointer select-none hover:text-sky-300 list-none flex items-center gap-2" {...props}>
+                <span className="text-xs transition-transform group-open:rotate-90">▶</span>
+                {children}
+              </summary>
+            );
+          },
+
           // Interactive Components
           vocabcard: (props: any) => <VocabCard {...props} />,
           quiz: (props: any) => <QuizBlock {...props} />,
+          flashcards: (props: any) => <FlashcardDeck {...props} />,
+          flashcard: (props: any) => <FlashcardDeck {...props} />,
+          reflex: (props: any) => <ReflexBlock {...props} />,
+          reflexes: (props: any) => <ReflexBlock {...props} />,
         } as any}
       >
         {cleanContent}

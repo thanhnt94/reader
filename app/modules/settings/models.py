@@ -15,6 +15,7 @@ class UserGlobalSettings(Base):
     tts_auto_advance = Column(Boolean, default=False)
     tts_sentence_delay = Column(Float, default=0.5)
     tts_lesson_delay = Column(Integer, default=2)
+    show_furigana = Column(Boolean, default=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
@@ -29,5 +30,6 @@ class UserGlobalSettings(Base):
             "tts_auto_advance": bool(self.tts_auto_advance) if self.tts_auto_advance is not None else False,
             "tts_sentence_delay": float(self.tts_sentence_delay) if self.tts_sentence_delay is not None else 0.5,
             "tts_lesson_delay": int(self.tts_lesson_delay) if self.tts_lesson_delay is not None else 2,
+            "show_furigana": bool(self.show_furigana) if self.show_furigana is not None else True,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
