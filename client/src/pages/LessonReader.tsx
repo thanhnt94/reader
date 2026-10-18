@@ -29,7 +29,9 @@ import {
   Copy,
   Flame,
   Check,
-  Shuffle
+  Shuffle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { readerApi, Lesson, Course, Chapter } from '../lib/api/readerApi';
@@ -953,6 +955,24 @@ export default function LessonReader() {
             </span>
           </button>
 
+          {/* Che tiếng Nhật / Blur Japanese Toggle Button */}
+          <button
+            type="button"
+            onClick={() => updateSettings({ blur_japanese: !settings.blur_japanese })}
+            title={settings.blur_japanese ? 'Hiển thị toàn bộ tiếng Nhật bình thường' : 'Che tiếng Nhật để luyện tự phản xạ (Bấm vào câu để hé mở)'}
+            className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+              settings.blur_japanese
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
+                : 'bg-slate-800/90 hover:bg-slate-700 text-slate-400 border-slate-700/60'
+            }`}
+          >
+            {settings.blur_japanese ? <EyeOff className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-400" /> : <Eye className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-slate-400" />}
+            <span className="hidden sm:inline">Che tiếng Nhật</span>
+            <span className={`text-[10px] font-bold ${settings.blur_japanese ? 'text-amber-400' : 'text-slate-500'}`}>
+              {settings.blur_japanese ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
           {/* Font Size & Spacing Controls */}
           <div className="hidden md:flex items-center rounded-xl bg-slate-800/80 p-0.5 text-xs text-slate-400">
             {(['sm', 'base', 'lg'] as const).map((sz) => (
@@ -1340,6 +1360,7 @@ export default function LessonReader() {
                 completedSections={completedSections}
                 onToggleSection={handleToggleSection}
                 showFurigana={settings.show_furigana !== false}
+                blurJapanese={Boolean(settings.blur_japanese)}
                 tocData={lesson.toc_data}
               />
             </div>

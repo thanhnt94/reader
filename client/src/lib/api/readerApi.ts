@@ -96,6 +96,7 @@ export interface UserSettings {
   tts_sentence_delay?: number;
   tts_lesson_delay?: number;
   show_furigana?: boolean;
+  blur_japanese?: boolean;
 }
 
 export interface LessonComment {

@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   tts_sentence_delay: 0.5,
   tts_lesson_delay: 1,
   show_furigana: true,
+  blur_japanese: false,
 };
 
 export const useAppStore = create<AppState>((set, get) => ({

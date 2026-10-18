@@ -12,6 +12,8 @@ import { VocabCard } from './VocabCard';
 import { QuizBlock } from './QuizBlock';
 import { FlashcardDeck } from './FlashcardDeck';
 import { ReflexBlock } from './ReflexBlock';
+import { LevelAnswersBlock } from './LevelAnswersBlock';
+import { BlurSpoiler } from './BlurSpoiler';
 import { Info, Lightbulb, AlertTriangle, Flame, AlertCircle, CheckCircle2, Circle } from 'lucide-react';
 
 interface MarkdownRendererProps {
@@ -23,6 +25,7 @@ interface MarkdownRendererProps {
   completedSections?: string[];
   onToggleSection?: (sectionId: string) => void;
   showFurigana?: boolean;
+  blurJapanese?: boolean;
   tocData?: Array<{ id: string; text: string; level: number }> | null;
 }
 
@@ -43,6 +46,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   completedSections,
   onToggleSection,
   showFurigana = true,
+  blurJapanese = false,
   tocData,
 }) => {
   // Helper to map heading text to exact TOC ID
@@ -111,8 +115,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     <div
       className={`prose prose-invert max-w-none text-slate-200 ${sizeClasses} ${spacingClasses} ${
         showFurigana === false ? 'hide-furigana' : ''
-      }`}
+      } ${blurJapanese ? 'blur-japanese-mode' : ''}`}
       data-furigana={showFurigana === false ? 'false' : 'true'}
+      data-blur-japanese={blurJapanese ? 'true' : 'false'}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
@@ -275,6 +280,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               return <FlashcardDeck dataString={codeString} />;
             }
 
+            if (lang === 'levels' || lang === 'level') {
+              return <LevelAnswersBlock dataString={codeString} globalBlur={blurJapanese} />;
+            }
+
             if (lang === 'reflex' || lang === 'reflexes') {
               return <ReflexBlock dataString={codeString} />;
             }
@@ -332,6 +341,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 {children}
               </div>
             );
+          },
+
+          // Click-to-reveal blur / spoiler tags
+          blur({ children }: any) {
+            return <BlurSpoiler globalBlur={blurJapanese}>{children}</BlurSpoiler>;
+          },
+          spoiler({ children }: any) {
+            return <BlurSpoiler globalBlur={blurJapanese}>{children}</BlurSpoiler>;
           },
 
           // Paragraphs

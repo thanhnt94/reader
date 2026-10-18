@@ -422,3 +422,28 @@ rt {
   margin: 0.75rem 0;
 }
 
+/* ==========================================================================
+   BLUR / CLICK-TO-REVEAL JAPANESE MODE
+   ========================================================================== */
+.blur-japanese-mode blockquote p:has(ruby),
+.blur-japanese-mode td:has(ruby) {
+  filter: blur(5.5px);
+  opacity: 0.38;
+  user-select: none;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.blur-japanese-mode blockquote p:has(ruby):hover,
+.blur-japanese-mode td:has(ruby):hover,
+.blur-japanese-mode .revealed-japanese {
+  filter: none !important;
+  opacity: 1 !important;
+  user-select: text !important;
+}
+
+blur, spoiler {
+  display: inline-block;
+  vertical-align: baseline;
+}
+
